@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         View Mode Switcher — Desktop / Mobile
 // @namespace    https://local/view-mode-switcher
-// @version      1.2.0
-// @description  Toggle any site between Desktop view and Mobile view (forces the page viewport) via a floating button, a keyboard shortcut (Alt+Shift+V), or the menu. Remembers your choice per site, with a global default. Most effective in a mobile browser. Tampermonkey / Violentmonkey.
+// @version      2.0.0
+// @description  Force any site into Desktop or Mobile rendering — not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" also renders the page in a centered phone-width frame (a desktop browser cannot truly resize its own window). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
 // @author       you
 // @match        *://*/*
 // @run-at       document-start
@@ -18,20 +18,109 @@
   'use strict';
 
   const CONFIG = {
-    showButton:   true,                                              // floating button — tap=switch, long-press=Auto, drag=move
-    hotkey:       { ctrl: false, alt: true, shift: true, key: 'v' }, // Alt+Shift+V toggles Desktop/Mobile
-    desktopWidth: 1280,                                              // width forced for Desktop view
-    longPressMs:  500,                                               // hold the button this long to reset to Auto
+    showButton:     true,                                              // floating button — tap=switch, long-press=Auto, drag=move
+    hotkey:         { ctrl: false, alt: true, shift: true, key: 'v' }, // Alt+Shift+V toggles Desktop/Mobile
+    desktopWidth:   1280,   // viewport width forced for Desktop view (the high-value case: "request desktop site" on a phone)
+    mobileWidth:    390,    // emulated device width for Mobile view (also the frame width on a desktop browser)
+    mobileHeight:   844,    // emulated device height (used for the spoofed screen/innerHeight)
+    frameOnDesktop: true,   // on a desktop browser, render Mobile view inside a centered phone-width frame
+    spoofUA:        true,   // override navigator.userAgent / platform / userAgentData
+    spoofTouch:     true,   // override maxTouchPoints + ontouchstart so touch detection flips
+    spoofMedia:     true,   // override window.matchMedia (+ innerWidth/screen in the frame) so JS-driven responsive layouts switch
+    longPressMs:    500,    // hold the button this long to reset to Auto
+    mobileUA:  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+    desktopUA: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   };
 
+  // ---- mode resolution (a per-site choice overrides the global default) ----
   const GM_OK = typeof GM_getValue === 'function';
   const gGet = (k, d) => (GM_OK ? GM_getValue(k, d) : d);
   const gSet = (k, v) => { if (GM_OK) GM_setValue(k, v); };
   const siteMode = (() => { try { return localStorage.getItem('vm_mode') || ''; } catch (e) { return ''; } })();
   const setSite = (m) => { try { localStorage.setItem('vm_mode', m); } catch (e) {} };
   const globalMode = gGet('vm_global', 'auto');
-  const mode = siteMode || globalMode;
+  const mode = siteMode || globalMode;   // 'auto' | 'desktop' | 'mobile'
 
+  // Capture what the REAL browser is before we spoof anything. A desktop browser
+  // cannot shrink its own OS window from a @grant-none script, so Mobile view there
+  // is delivered as a centered phone-width frame instead of a real reflow.
+  const realUA = navigator.userAgent;
+  const realMobile = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(realUA) ||
+                     (navigator.maxTouchPoints > 1 && !/Macintosh/.test(realUA));
+  const toMobile = mode === 'mobile';
+  const useFrame = toMobile && !realMobile && CONFIG.frameOnDesktop;
+
+  // ---- device-signal spoofing — must run before the page's own scripts ----
+  const def = (obj, prop, getter) => {
+    try { Object.defineProperty(obj, prop, { configurable: true, get: getter }); return true; }
+    catch (e) { return false; }
+  };
+
+  function installMatchMedia(emuWidth, coarse) {
+    const native = window.matchMedia ? window.matchMedia.bind(window) : null;
+    const decide = (qRaw) => {
+      const q = String(qRaw).toLowerCase();
+      let m;
+      if ((m = q.match(/min-width:\s*(\d+(?:\.\d+)?)px/))) return emuWidth >= parseFloat(m[1]);
+      if ((m = q.match(/max-width:\s*(\d+(?:\.\d+)?)px/))) return emuWidth <= parseFloat(m[1]);
+      if (q.includes('pointer: coarse') || q.includes('any-pointer: coarse')) return coarse;
+      if (q.includes('pointer: fine')   || q.includes('any-pointer: fine'))   return !coarse;
+      if (q.includes('hover: none'))  return coarse;
+      if (q.includes('hover: hover')) return !coarse;
+      return null;   // not a query we emulate → delegate to the real engine
+    };
+    window.matchMedia = function (query) {
+      const verdict = decide(query);
+      if (verdict === null && native) return native(query);
+      return {
+        matches: !!verdict, media: String(query), onchange: null,
+        addEventListener() {}, removeEventListener() {},
+        addListener() {}, removeListener() {}, dispatchEvent() { return false; },
+      };
+    };
+  }
+
+  function spoofSignals() {
+    if (mode === 'auto') return;
+    if (CONFIG.spoofUA) {
+      const ua = toMobile ? CONFIG.mobileUA : CONFIG.desktopUA;
+      def(navigator, 'userAgent', () => ua);
+      def(navigator, 'appVersion', () => ua.replace(/^Mozilla\//, ''));
+      def(navigator, 'platform', () => (toMobile ? 'Linux armv8l' : 'Win32'));
+      def(navigator, 'vendor', () => 'Google Inc.');
+      try {
+        const prevBrands = navigator.userAgentData ? navigator.userAgentData.brands : [];
+        def(navigator, 'userAgentData', () => ({
+          mobile: toMobile,
+          platform: toMobile ? 'Android' : 'Windows',
+          brands: prevBrands,
+          getHighEntropyValues: () => Promise.resolve({ mobile: toMobile, platform: toMobile ? 'Android' : 'Windows' }),
+          toJSON: () => ({ mobile: toMobile, platform: toMobile ? 'Android' : 'Windows', brands: prevBrands }),
+        }));
+      } catch (e) {}
+    }
+    if (CONFIG.spoofTouch) {
+      def(navigator, 'maxTouchPoints', () => (toMobile ? 5 : 0));
+      try { if (toMobile && !('ontouchstart' in window)) window.ontouchstart = null; } catch (e) {}
+    }
+    if (CONFIG.spoofMedia) {
+      const emuW = toMobile ? CONFIG.mobileWidth : CONFIG.desktopWidth;
+      installMatchMedia(emuW, toMobile);
+      // Only override the reported size when we're emulating in a frame; lying about
+      // innerWidth when it doesn't match the real paint breaks scroll/hit-test math.
+      if (useFrame) {
+        def(window, 'innerWidth',  () => CONFIG.mobileWidth);
+        def(window, 'innerHeight', () => CONFIG.mobileHeight);
+        def(screen,  'width',       () => CONFIG.mobileWidth);
+        def(screen,  'height',      () => CONFIG.mobileHeight);
+        def(screen,  'availWidth',  () => CONFIG.mobileWidth);
+        def(screen,  'availHeight', () => CONFIG.mobileHeight);
+        def(window,  'devicePixelRatio', () => 3);
+      }
+    }
+  }
+
+  // ---- viewport (the real lever on a mobile browser) ----------------------
   function applyViewport() {
     if (mode === 'auto') return;
     document.querySelectorAll('meta[name="viewport"]').forEach((el) => { if (!el.hasAttribute('data-vm')) el.remove(); });
@@ -42,13 +131,33 @@
       meta.setAttribute('data-vm', '1');
       (document.head || document.documentElement).appendChild(meta);
     }
-    meta.setAttribute('content', mode === 'desktop' ? 'width=' + CONFIG.desktopWidth : 'width=device-width, initial-scale=1');
+    meta.setAttribute('content', mode === 'desktop'
+      ? 'width=' + CONFIG.desktopWidth
+      : 'width=device-width, initial-scale=1');
   }
 
+  // ---- desktop phone-frame (a desktop browser can't shrink its own window) -
+  function applyFrame() {
+    if (!useFrame || document.getElementById('vm-frame-style')) return;
+    const w = CONFIG.mobileWidth;
+    const style = document.createElement('style');
+    style.id = 'vm-frame-style';
+    style.textContent =
+      'html.vm-framed{background:#202124!important;overflow-x:hidden!important}' +
+      'html.vm-framed>body{width:' + w + 'px!important;min-width:' + w + 'px!important;max-width:' + w + 'px!important;' +
+        'margin:0 auto!important;min-height:100vh!important;overflow-x:hidden!important;' +
+        'box-shadow:0 0 0 100vmax #202124,0 0 40px rgba(0,0,0,.6)!important}';
+    (document.head || document.documentElement).appendChild(style);
+    document.documentElement.classList.add('vm-framed');
+  }
+
+  // ---- apply everything ASAP, then re-assert as the page mutates ----------
+  spoofSignals();
   applyViewport();
   if (mode !== 'auto') {
-    document.addEventListener('DOMContentLoaded', applyViewport);
-    [400, 1500, 3500].forEach((t) => setTimeout(applyViewport, t));
+    const reassert = () => { applyViewport(); applyFrame(); };
+    document.addEventListener('DOMContentLoaded', reassert);
+    [200, 600, 1500, 3500].forEach((t) => setTimeout(reassert, t));
   }
 
   function toggleMode() {

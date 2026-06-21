@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube — Skip & Hide Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.4.0
+// @version      1.4.1
 // @description  Auto-skips YouTube video ads (clicks Skip, seeks past unskippable ones, mutes them), skips Sponsored Shorts, and hides feed/banner/overlay ads. Works on desktop and m.youtube.com. Greasemonkey / Tampermonkey / Violentmonkey. For network-level blocking, pair with uBlock Origin.
 // @author       you
 // @match        https://www.youtube.com/*
@@ -43,6 +43,11 @@
   ];
   const FEED_WRAPPERS = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ytd-item-section-renderer, ytm-rich-item-renderer, ytm-item-section-renderer';
 
+  // YouTube flags an active ad by putting one of these classes on the player element.
+  const VIDEO_AD_CLASSES = ['ad-showing', 'ad-interrupting'];
+  const SHORT_AD_CLASSES = ['ad-showing', 'ad-interrupting', 'ad-created'];
+  const hasAnyClass = (el, classes) => !!el && classes.some((c) => el.classList.contains(c));
+
   function injectStyle() {
     const rules = [];
     if (CONFIG.hideBanners) rules.push(...BANNER_HIDE);
@@ -68,7 +73,7 @@
     if (!CONFIG.skipVideoAds) return;
     const player = document.querySelector('#movie_player, .html5-video-player');
     const video = document.querySelector('.html5-video-player video') || document.querySelector('video');
-    const adShowing = !!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'));
+    const adShowing = hasAnyClass(player, VIDEO_AD_CLASSES);
     if (adShowing) {
       const skip = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-ad-skip-button-container button');
       if (skip) skip.click();
@@ -88,7 +93,7 @@
   function skipShortAd() {
     if (!CONFIG.skipShortsAds || !/^\/shorts/.test(location.pathname)) return;
     const player = document.querySelector('#shorts-player');
-    const ad = (!!player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting') || player.classList.contains('ad-created')))
+    const ad = hasAnyClass(player, SHORT_AD_CLASSES)
       || !!document.querySelector('ytd-reel-video-renderer ad-slot-renderer, ytd-reel-video-renderer ytd-ad-slot-renderer, ytd-shorts ytd-ad-slot-renderer, ytd-shorts ad-slot-renderer');
     if (!ad || Date.now() - lastShortSkipAt < 700) return;
     lastShortSkipAt = Date.now();

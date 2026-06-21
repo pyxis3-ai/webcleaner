@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Site Blocker
 // @namespace    https://local/site-blocker
-// @version      1.3.0
+// @version      1.3.1
 // @description  Block distracting / adult sites on demand. Adult always-on; a "Focus Pack" auto-blocks during work hours (Mon–Fri 9–6 by default) or whenever you flip "Focus mode now". Add/remove sites and toggle from the menu; "Allow for 5 min" snooze. For comprehensive adult blocking pair with a DNS family filter (Cloudflare 1.1.1.3 / NextDNS). Tampermonkey / Violentmonkey.
 // @author       you
 // @match        *://*/*
@@ -47,8 +47,9 @@
   const blockAdult  = gGet('sb_adult', CONFIG.blockAdultDefault);
   const blockFocus  = gGet('sb_focus', CONFIG.blockFocusDefault);
   const scheduleOn  = gGet('sb_sched', CONFIG.schedule.enabled);
-  const custom = gGet('sb_custom', []);   // sites you added from the menu
-  const allow  = gGet('sb_allow', []);    // sites you removed / always allow
+  const asList = (v) => (Array.isArray(v) ? v : []);     // tolerate corrupted / legacy storage
+  const custom = asList(gGet('sb_custom', []));   // sites you added from the menu
+  const allow  = asList(gGet('sb_allow', []));    // sites you removed / always allow
   const dedupe = (arr) => [...new Set(arr)];
 
   const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
