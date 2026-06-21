@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         View Mode Switcher — Desktop / Mobile
 // @namespace    https://local/view-mode-switcher
-// @version      2.0.0
-// @description  Force any site into Desktop or Mobile rendering — not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" also renders the page in a centered phone-width frame (a desktop browser cannot truly resize its own window). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
+// @version      2.1.0
+// @description  Force any site into Desktop or Mobile rendering — not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" serves the full-width mobile site (an optional centered phone-width frame is available in CONFIG). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
 // @author       you
 // @match        *://*/*
 // @run-at       document-start
@@ -23,7 +23,7 @@
     desktopWidth:   1280,   // viewport width forced for Desktop view (the high-value case: "request desktop site" on a phone)
     mobileWidth:    390,    // emulated device width for Mobile view (also the frame width on a desktop browser)
     mobileHeight:   844,    // emulated device height (used for the spoofed screen/innerHeight)
-    frameOnDesktop: true,   // on a desktop browser, render Mobile view inside a centered phone-width frame
+    frameOnDesktop: false,  // desktop Mobile view fills the window (full-width mobile site); set true for a centered phone-width frame instead
     spoofUA:        true,   // override navigator.userAgent / platform / userAgentData
     spoofTouch:     true,   // override maxTouchPoints + ontouchstart so touch detection flips
     spoofMedia:     true,   // override window.matchMedia (+ innerWidth/screen in the frame) so JS-driven responsive layouts switch
@@ -45,8 +45,11 @@
   // cannot shrink its own OS window from a @grant-none script, so Mobile view there
   // is delivered as a centered phone-width frame instead of a real reflow.
   const realUA = navigator.userAgent;
-  const realMobile = /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(realUA) ||
-                     (navigator.maxTouchPoints > 1 && !/Macintosh/.test(realUA));
+  const uaData = navigator.userAgentData;
+  const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(realUA) ||
+                     /iPad/.test(realUA) ||
+                     (/Macintosh/.test(realUA) && navigator.maxTouchPoints > 1) ||   // iPadOS reports its UA as "Macintosh"
+                     (!!uaData && uaData.mobile === true);
   const toMobile = mode === 'mobile';
   const useFrame = toMobile && !realMobile && CONFIG.frameOnDesktop;
 
