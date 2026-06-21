@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed — Real Newsfeed Only
 // @namespace    https://local/fb-clean-feed
-// @version      2.4.0
+// @version      2.5.0
 // @description  Strips Facebook down to just your real newsfeed. Hides ads/Sponsored (beats FB's character-scramble obfuscation), Stories, Reels, "Suggested for you", "People you may know", and the left & right sidebars. Strips UTM/tracking params and unwraps l.php redirect links. Greasemonkey / Tampermonkey / Violentmonkey.
 // @author       you
 // @match        https://www.facebook.com/*
@@ -27,7 +27,7 @@
     hideComposer:         true,   // the "What's on your mind?" box
     hideTopBar:           true,   // the blue bar (search, profile, notifications). NUCLEAR
     forceMostRecent:      true,   // jump Home to the chronological "Most Recent" feed (?sk=h_chr)
-    feedZoom:             1.7,    // enlarge the feed into the empty space around it (1 = off). Crisp CSS zoom, not blurry scaling. Tune to taste.
+    feedZoom:             1,      // enlarge the feed into the empty space around it (1 = off). WARNING: any value >1 uses CSS zoom, which corrupts the Sponsored-label geometry FB relies on for obfuscation — ads then slip through. Leave at 1 for reliable ad-hiding; only raise it if you care more about a bigger feed than blocking ads.
     showToggleButton:     true,   // floating 🧹 button (bottom-right) to switch cleaning on/off
     toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },  // Alt+Shift+F toggles cleaning on/off
     stripTracking:        true,   // strip UTM/fbclid/__tn__ etc. params and unwrap l.php redirect links
@@ -128,6 +128,8 @@
   }
 
   const VIEWPAD = 500;
+  const HEADER_BAND = 130;          // px below a story's top to scan for the Sponsored/Suggested label (FB headers got taller)
+  const CLEAN_CONFIRMATIONS = 4;    // re-read an in-view post this many sweeps before trusting it as non-ad — FB injects the scrambled "Sponsored" label a beat AFTER the post first renders, so a one-shot read misses it
   function isJunkHeader(compact) {
     if (!compact) return false;
     for (const m of INCLUDE_MARKS) if (compact.includes(m)) return true;
@@ -140,20 +142,20 @@
     feed.setAttribute('data-fcf-feed', '');
     const vh = window.innerHeight;
     for (const story of feed.children) {
-      const state = story.__fcf;
-      if (state === 'hidden' || state === 'clean') continue;
+      if (story.__fcf === 'hidden') continue;   // hiding is permanent
+      if (story.__fcf === 'clean') continue;    // settled non-ad (confirmed across several sweeps)
       const r = story.getBoundingClientRect();
       if (r.height < 60) continue;
       if (r.bottom < -VIEWPAD || r.top > vh + VIEWPAD) continue;
-      const header = renderedText(story, r.top - 2, r.top + 95);
-      if (!header) continue;
+      const header = renderedText(story, r.top - 2, r.top + HEADER_BAND);
+      if (!header) continue;                    // not hydrated yet — leave unsettled, re-check next sweep
       const junk = isJunkHeader(norm(header)) ||
         (CONFIG.hideReelsTrays && story.querySelectorAll('a[href*="/reel/"]').length > 3);
       if (junk) {
         story.setAttribute('data-fcf-hide', '');
         story.__fcf = 'hidden';
-      } else {
-        story.__fcf = 'clean';
+      } else if ((story.__fcfSeen = (story.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
+        story.__fcf = 'clean';                  // only trust "clean" after FB has had time to inject a late "Sponsored" label
       }
     }
   }
