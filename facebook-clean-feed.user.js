@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed — Real Newsfeed Only
 // @namespace    https://local/fb-clean-feed
-// @version      2.6.0
+// @version      2.7.0
 // @description  Strips Facebook down to just your real newsfeed. Hides ads/Sponsored (beats FB's character-scramble obfuscation), Stories, Reels, "Suggested for you", "People you may know", and the left & right sidebars. Strips UTM/tracking params and unwraps l.php redirect links. Greasemonkey / Tampermonkey / Violentmonkey.
 // @author       you
 // @match        https://www.facebook.com/*
@@ -58,6 +58,7 @@
     const R = [P + '[data-fcf-hide]{display:none!important}'];
     if (CONFIG.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
     if (CONFIG.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
+    if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');  // left rail, every page (not just the feed)
     if (CONFIG.hideComposer)     R.push(P + '[role="region"][aria-label="Create a post"]{display:none!important}');
     if (CONFIG.hideTopBar)       R.push(P + '[role="banner"],' + P + '[role="navigation"][aria-label="Facebook"],' + P + '[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}');
     if (CONFIG.hideReelsTrays)   R.push(P + '[aria-label="Stories"],' + P + '[aria-label="Reels"]{display:none!important}');
@@ -157,6 +158,19 @@
       } else if ((story.__fcfSeen = (story.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
         story.__fcf = 'clean';                  // only trust "clean" after FB has had time to inject a late "Sponsored" label
       }
+    }
+  }
+
+  // The left navigation rail (Shortcuts / your groups / bookmarks) appears on EVERY
+  // Facebook page, not just the feed, and FB dropped its aria-label so the CSS rule
+  // misses it. Detect it by signature — a tall element pinned to the left edge — and
+  // hide it site-wide. Runs on all pages; the feed-only strip handles everything else.
+  function hideLeftRail() {
+    if (!CONFIG.hideLeftSidebar) return;
+    for (const nav of document.querySelectorAll('[role="navigation"]:not([data-fcf-leftnav])')) {
+      const r = nav.getBoundingClientRect();
+      if (r.height > 350 && r.width >= 150 && r.width <= 460 && r.left <= 24)
+        nav.setAttribute('data-fcf-leftnav', '');
     }
   }
 
@@ -265,6 +279,7 @@
   function sweep() {
     try {
       if (CONFIG.stripTracking) cleanTracking();
+      hideLeftRail();                       // remove the left rail on every page
       const strip = isFeedPage();
       document.documentElement.classList.toggle('fcf-strip', strip);
       if (strip) { hardenStructure(); processStories(); }
