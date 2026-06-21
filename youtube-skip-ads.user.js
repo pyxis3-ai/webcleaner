@@ -9,8 +9,8 @@
 // @run-at       document-start
 // @grant        none
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/oabdrabo/userscripts/main/youtube-skip-ads.user.js
-// @updateURL   https://raw.githubusercontent.com/oabdrabo/userscripts/main/youtube-skip-ads.user.js
+// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
+// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
 // ==/UserScript==
 
 (function () {

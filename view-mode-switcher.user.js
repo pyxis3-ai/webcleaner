@@ -10,8 +10,8 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/oabdrabo/userscripts/main/view-mode-switcher.user.js
-// @updateURL   https://raw.githubusercontent.com/oabdrabo/userscripts/main/view-mode-switcher.user.js
+// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
+// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
 // ==/UserScript==
 
 (function () {

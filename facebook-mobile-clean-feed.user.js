@@ -8,8 +8,8 @@
 // @run-at       document-start
 // @grant        none
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/oabdrabo/userscripts/main/facebook-mobile-clean-feed.user.js
-// @updateURL   https://raw.githubusercontent.com/oabdrabo/userscripts/main/facebook-mobile-clean-feed.user.js
+// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-mobile-clean-feed.user.js
+// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-mobile-clean-feed.user.js
 // ==/UserScript==
 
 (function () {
