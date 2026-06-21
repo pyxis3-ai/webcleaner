@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed — Real Newsfeed Only
 // @namespace    https://local/fb-clean-feed
-// @version      2.5.0
+// @version      2.6.0
 // @description  Strips Facebook down to just your real newsfeed. Hides ads/Sponsored (beats FB's character-scramble obfuscation), Stories, Reels, "Suggested for you", "People you may know", and the left & right sidebars. Strips UTM/tracking params and unwraps l.php redirect links. Greasemonkey / Tampermonkey / Violentmonkey.
 // @author       you
 // @match        https://www.facebook.com/*
@@ -201,7 +201,7 @@
     }
     if (!active) return;
     let reel = active;
-    for (let i = 0; i < 9 && reel.parentElement; i++) {
+    for (let i = 0; i < 12 && reel.parentElement; i++) {
       reel = reel.parentElement;
       if (reel.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]')) break;
     }
@@ -213,22 +213,21 @@
     if (next) next.click();
     else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   }
+  // FB reels no longer tag "Sponsored" with positioned single-character spans (the old
+  // hunt found zero candidates and never fired). Reconstruct the reel's overlay text by
+  // geometry — the same un-scramble used on the feed — and look for the Sponsored mark.
+  // Memoize per reel, but keep re-checking until found: FB injects the label a beat late.
+  let _reelSponId = null, _reelSpon = false, _reelTries = 0;
   function reelIsSponsored(reel) {
-    const hosts = new Set();
-    for (const s of reel.querySelectorAll('span')) {
-      const t = s.textContent;
-      if (!t || t.trim().length !== 1) continue;
-      if (getComputedStyle(s).position !== 'absolute') continue;
-      let h = s.parentElement; if (h) h = h.parentElement;
-      if (h) hosts.add(h);
-      if (hosts.size > 8) break;
-    }
-    for (const h of hosts) {
-      const r = h.getBoundingClientRect();
-      const c = norm(renderedText(h, r.top - 6, r.bottom + 6));
-      if (SPONSORED_MARKS.some((m) => c.includes(m))) return true;
-    }
-    return false;
+    const id = location.pathname;
+    if (_reelSponId !== id) { _reelSponId = id; _reelSpon = false; _reelTries = 0; }
+    if (_reelSpon) return true;
+    if (_reelTries >= 8) return false;
+    _reelTries++;
+    const r = reel.getBoundingClientRect();
+    const c = norm(renderedText(reel, r.top - 2, r.bottom + 2));
+    if (SPONSORED_MARKS.some((m) => c.includes(m))) _reelSpon = true;
+    return _reelSpon;
   }
 
   const TRACK_EXACT = new Set(['fbclid', 'gclid', 'dclid', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'twclid', 'igshid', 'mc_eid', 'mc_cid', '_openstat', 'vero_id', 'oly_enc_id', 'oly_anon_id', 'wickedid', '_hsenc', '_hsmi', 'mkt_tok', 'ref', 'refsrc', 'refid', 'fref', 'hc_ref', 'hc_location', 'ref_src', 'ref_url', 'eav', 'paipv', 'comment_tracking', 'av', 'rdid']);
