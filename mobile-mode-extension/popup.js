@@ -1,5 +1,7 @@
 'use strict';
 
+const api = globalThis.browser || globalThis.chrome;
+
 const DEVICES = [
   ['pixel', 'Pixel 8 (412px)'],
   ['iphone', 'iPhone (393px)'],
@@ -7,22 +9,30 @@ const DEVICES = [
   ['responsive', 'Responsive (390px)'],
 ];
 
-const send = (m) => new Promise((r) => chrome.runtime.sendMessage(m, r));
+const send = (m) => api.runtime.sendMessage(m);
 const status = (t) => { document.getElementById('status').textContent = t; };
 
 function render(state) {
   const wrap = document.getElementById('devices');
   wrap.replaceChildren();
-  for (const [key, label] of DEVICES) {
-    const b = document.createElement('button');
-    b.textContent = label;
-    if (state.device === key) b.classList.add('active');
-    b.onclick = async () => {
-      const r = await send({ cmd: 'device', key });
-      if (r && r.error) status('Error: ' + r.error + '  (is DevTools open on this tab? close it and retry)');
-      else refresh();
-    };
-    wrap.appendChild(b);
+  if (!state.hasDebugger) {
+    // Firefox: no debugger/CDP extension API. Point at the built-in tool.
+    const note = document.createElement('div');
+    note.className = 'status';
+    note.textContent = 'Device mode needs Chrome/Edge. On Firefox, use the built-in Responsive Design Mode: Ctrl+Shift+M.';
+    wrap.appendChild(note);
+  } else {
+    for (const [key, label] of DEVICES) {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (state.device === key) b.classList.add('active');
+      b.onclick = async () => {
+        const r = await send({ cmd: 'device', key });
+        if (r && r.error) status('Error: ' + r.error);
+        else refresh();
+      };
+      wrap.appendChild(b);
+    }
   }
   document.getElementById('uaonly').classList.toggle('active', !!state.uaOnly);
 }

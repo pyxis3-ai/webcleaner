@@ -24,18 +24,30 @@ GET https://m.facebook.com/   ->  301   location: https://www.facebook.com/?_rdr
 
 A userscript runs inside a loaded page; it can't set those request headers and never even executes on the mobile host. And CSS `@media` is evaluated against the real window width, which a userscript can't change (CSS zoom, viewport meta, `matchMedia` spoofing, and iframes were all tested and ruled out - the big sites also block framing). Only the browser can change the User-Agent and the viewport - which is what this extension does.
 
+## What works where
+
+| | Chrome / Edge / Brave | Firefox |
+|---|---|---|
+| Mobile UA only (no banner) | yes | yes |
+| Device mode (true reflow) | yes (debugger API) | **no API** - use Firefox's built-in **Ctrl+Shift+M** (Responsive Design Mode), which does the same thing natively (reflow + device UA) |
+
+Firefox simply doesn't expose a viewport-emulation API to extensions, so the popup hides the device buttons there and points you at the built-in tool. The extension still loads and the UA toggle works.
+
 ## Install (load unpacked)
 
-1. Open `chrome://extensions` (or `edge://extensions`).
-2. Turn on **Developer mode** (top-right).
-3. Click **Load unpacked** and select this `mobile-mode-extension/` folder.
-4. Pin it, click the icon, pick a device (or Mobile UA only).
+**Chrome / Edge / Brave:**
+1. Open `chrome://extensions` (or `edge://extensions`), turn on **Developer mode**.
+2. **Load unpacked** -> select this `mobile-mode-extension/` folder. (If you already loaded an older version, click its **reload** to accept the new `debugger` permission.)
+3. Pin it, click the icon, pick a device (or Mobile UA only).
 
-Chrome / Edge / Brave (Manifest V3). Firefox needs minor manifest changes.
+**Firefox:**
+1. Open `about:debugging#/runtime/this-firefox`.
+2. **Load Temporary Add-on...** -> select this folder's `manifest.json`. (Temporary add-ons clear on restart; that's a Firefox dev limitation unless you sign/package it.)
+3. Click the icon -> **Mobile UA only**. For true reflow, use **Ctrl+Shift+M**.
 
 ## Notes / limits
 
-- **Device mode is per-tab**; Mobile UA only is global. Use **Off / reset** to clear.
+- **Device mode is per-tab** (Chrome); Mobile UA only is global. Use **Off / reset** to clear.
 - If a device button errors, **close DevTools on that tab** first - only one debugger can attach per tab.
-- Manifest V3 service workers can sleep when idle; if emulation drops on a long-idle tab, click the device again.
+- Manifest V3 background workers can sleep when idle; if emulation drops on a long-idle tab, click the device again.
 - Pairs with the userscripts: in Mobile mode, mobile Facebook is cleaned by **facebook-mobile-clean-feed**, YouTube ads by **youtube-skip-ads**.
