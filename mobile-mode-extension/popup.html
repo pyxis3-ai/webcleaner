@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px system-ui, -apple-system, sans-serif; margin: 0; padding: 11px; width: 230px; background: #0f131c; color: #e7ecf3; }
+  h4 { margin: 10px 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #9aa4b4; font-weight: 600; }
+  h4:first-child { margin-top: 0; }
+  button { display: block; width: 100%; text-align: left; margin: 3px 0; padding: 7px 10px; border: 1px solid #252b39; border-radius: 8px; background: #161b26; color: #e7ecf3; cursor: pointer; font: inherit; }
+  button:hover { border-color: #3b82f6; }
+  button.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .status { color: #646e80; font-size: 11px; margin-top: 9px; line-height: 1.4; }
+</style>
+</head>
+<body>
+  <h4>Device mode (true reflow &middot; shows banner)</h4>
+  <div id="devices"></div>
+  <h4>Lightweight (no banner)</h4>
+  <button id="uaonly">Mobile UA only (all tabs)</button>
+  <button id="off">Off / reset this tab</button>
+  <div class="status" id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

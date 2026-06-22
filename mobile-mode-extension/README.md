@@ -1,39 +1,41 @@
 # Mobile Mode (browser extension)
 
-Force websites to serve their **mobile interface** on your desktop browser - the one thing the userscripts in this repo provably **cannot** do.
+Get mobile sites - and true mobile **reflow** - on your desktop browser. This is the companion the userscripts in this repo provably **cannot** be (a userscript can't change a navigation's User-Agent or the viewport; an extension can).
 
-## Why a userscript can't do this (the part everyone gets wrong)
+Click the toolbar icon for a small popup with two tools:
 
-When you open `m.facebook.com` on a desktop browser, the server answers with a **301 redirect** straight back to `www.facebook.com` - *before any page JavaScript runs.* Traced to the wire:
+## 1. Device mode (true reflow) - reflows ANY site
+
+Picks a phone (Pixel 8 / iPhone / iPad mini / Responsive 390px) and emulates it on the active tab using the Chrome DevTools Protocol (`Emulation.setDeviceMetricsOverride` + `setUserAgentOverride` + `setTouchEmulationEnabled`) via the `debugger` API. This is exactly what DevTools "device mode" / responsive design mode does - it changes the **real viewport**, so even normal CSS-`@media` sites reflow to their mobile layout, and the mobile User-Agent makes UA-sniffing sites serve mobile too.
+
+Trade-off: while it's active, Chrome shows a yellow **"Mobile Mode started debugging this browser"** banner. Every debugger-based emulator (and DevTools itself) shows it; it's unavoidable. Click **Off / reset this tab** to stop.
+
+## 2. Mobile UA only (no banner) - for UA-sniffing sites
+
+A global toggle that rewrites the `User-Agent` + `Sec-CH-UA-Mobile` headers to a phone via `declarativeNetRequest`. Facebook, YouTube, and other sites that pick layout by User-Agent then serve their mobile site - no banner. It does **not** reflow pure-CSS-responsive sites (the viewport stays desktop-width); use Device mode for those.
+
+## Why a userscript can't do either
+
+`m.facebook.com` on desktop returns a **301 to www before any page JavaScript runs**, decided from the request's `User-Agent` / `Sec-CH-UA-Mobile` headers:
 
 ```
-GET https://m.facebook.com/        →  301   location: https://www.facebook.com/?_rdr
-  request headers (set by the BROWSER, not the page):
-    user-agent: …Macintosh… Chrome…   ← desktop
-    sec-ch-ua-mobile: ?0              ← Client Hint: "not mobile"
+GET https://m.facebook.com/   ->  301   location: https://www.facebook.com/?_rdr
 ```
 
-A userscript runs *inside a page after it loads*. It can spoof `navigator.userAgent` for JavaScript, but it **cannot change the `User-Agent` / `Sec-CH-UA-Mobile` headers on a navigation request** - those are sent by the browser before the userscript exists. So it never even runs on `m.facebook.com`. (CSS `@media`, viewport meta, CSS zoom, and iframes were all tested and ruled out too; the big sites also block framing.)
-
-**An extension can rewrite request headers via `declarativeNetRequest`.** Verified: with a mobile UA, `www.facebook.com` serves its mobile interface on a 1280px desktop window (mobile viewport meta, no desktop sidebars, mobile tab bar).
-
-## What it does
-
-A single toolbar toggle. When **on** (badge shows `M`), it rewrites the `User-Agent` + `Sec-CH-UA-Mobile` + `Sec-CH-UA-Platform` headers on every request to an Android Chrome phone, and reloads the tab. Sites that pick layout by User-Agent (Facebook, YouTube, and many others) then serve their mobile version. Toggle **off** to go back to normal.
-
-This gives you the mobile **site/interface** on desktop (rendered at your window width). For an exact phone-sized **viewport** too, use the browser's built-in **DevTools device mode** (`Cmd+Shift+M` / `Ctrl+Shift+M`) - that's the only thing that truly resizes the viewport, and it's what device-emulator extensions use under the hood.
+A userscript runs inside a loaded page; it can't set those request headers and never even executes on the mobile host. And CSS `@media` is evaluated against the real window width, which a userscript can't change (CSS zoom, viewport meta, `matchMedia` spoofing, and iframes were all tested and ruled out - the big sites also block framing). Only the browser can change the User-Agent and the viewport - which is what this extension does.
 
 ## Install (load unpacked)
 
 1. Open `chrome://extensions` (or `edge://extensions`).
 2. Turn on **Developer mode** (top-right).
 3. Click **Load unpacked** and select this `mobile-mode-extension/` folder.
-4. Pin the extension; click its icon to toggle Mobile Mode (the `M` badge means it's on). Reload Facebook/YouTube to see the mobile site.
+4. Pin it, click the icon, pick a device (or Mobile UA only).
 
-Works in Chrome/Edge/Brave (Manifest V3). Firefox needs minor manifest tweaks (different `background` key).
+Chrome / Edge / Brave (Manifest V3). Firefox needs minor manifest changes.
 
 ## Notes / limits
 
-- It's a **global** toggle (all sites) - turn it off for normal desktop browsing.
-- A few sites detect the UA/touch mismatch; if one misbehaves, toggle off.
-- It pairs with the userscripts: in Mobile Mode, `m.facebook.com` / mobile Facebook is cleaned by **facebook-mobile-clean-feed**, YouTube ads by **youtube-skip-ads**.
+- **Device mode is per-tab**; Mobile UA only is global. Use **Off / reset** to clear.
+- If a device button errors, **close DevTools on that tab** first - only one debugger can attach per tab.
+- Manifest V3 service workers can sleep when idle; if emulation drops on a long-idle tab, click the device again.
+- Pairs with the userscripts: in Mobile mode, mobile Facebook is cleaned by **facebook-mobile-clean-feed**, YouTube ads by **youtube-skip-ads**.

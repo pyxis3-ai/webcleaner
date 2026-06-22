@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Mobile Mode - serve the mobile site on desktop",
-  "version": "1.0.0",
-  "description": "Toolbar toggle that rewrites the User-Agent + UA client hints to a phone, so sites (Facebook, YouTube, …) serve their real mobile interface in your desktop browser. This is the companion a userscript can't be: a userscript cannot change a navigation's User-Agent (the browser sets it before any page script runs - see the 301 from m.facebook.com); an extension can.",
-  "permissions": ["declarativeNetRequest", "storage", "activeTab"],
+  "name": "Mobile Mode - mobile sites + device emulation on desktop",
+  "version": "1.1.0",
+  "description": "Toolbar popup with two ways to get mobile on desktop: (1) Mobile UA only - rewrites the User-Agent so UA-sniffing sites (Facebook, YouTube) serve their mobile site, no banner; (2) Device mode - true DevTools-style viewport emulation via the debugger API that reflows ANY site (normal CSS-responsive ones too), shows Chrome's debugging banner.",
+  "permissions": ["declarativeNetRequest", "storage", "debugger", "tabs"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
-  "action": { "default_title": "Toggle Mobile Mode (rewrite User-Agent → phone)" }
+  "action": { "default_title": "Mobile Mode", "default_popup": "popup.html" }
 }

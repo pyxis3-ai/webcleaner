@@ -37,4 +37,9 @@ Shortcuts ignore typing in text fields and never use Cmd/Ctrl. Each is editable 
 
 ## Mobile Mode (companion extension) - mobile sites on desktop
 
-Big sites (Facebook, YouTube) decide desktop-vs-mobile from the request's **User-Agent** at the server, returning a 301 *before any page script runs* - so a userscript fundamentally **cannot** force their mobile site on desktop (it can't change a navigation's User-Agent; only the browser can). The small **[`mobile-mode-extension/`](mobile-mode-extension/)** (Manifest V3, load-unpacked) does it the only way that works: a toolbar toggle that rewrites the `User-Agent` + UA client hints to a phone via `declarativeNetRequest`, so sites serve their mobile interface in your desktop browser. See its [README](mobile-mode-extension/README.md). For an exact phone-sized *viewport*, use DevTools device mode (`Cmd/Ctrl+Shift+M`).
+A userscript fundamentally **cannot** force a mobile layout on desktop: big sites (Facebook, YouTube) decide mobile-vs-desktop from the request's **User-Agent** at the server (301 before any page script runs), and normal sites decide it from CSS `@media` against the real window width - and a userscript can change neither (only the browser can). The small **[`mobile-mode-extension/`](mobile-mode-extension/)** (Manifest V3, load-unpacked) does both, via a toolbar popup:
+
+- **Device mode** - true DevTools-style viewport emulation (`Emulation.setDeviceMetricsOverride` via the `debugger` API) that reflows **any** site, normal CSS-responsive ones included (pick Pixel / iPhone / iPad / Responsive). Shows Chrome's debugging banner while active.
+- **Mobile UA only** - rewrites the `User-Agent` via `declarativeNetRequest` so UA-sniffing sites serve their mobile site; no banner.
+
+See its [README](mobile-mode-extension/README.md).
