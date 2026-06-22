@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Mobile Mode - mobile sites + device emulation on desktop",
-  "version": "1.2.0",
-  "description": "Toolbar popup to get mobile on desktop. Chrome/Edge: full - 'Device mode' is true DevTools-style viewport emulation (debugger API) that reflows ANY site, plus 'Mobile UA only' (no banner). Firefox: 'Mobile UA only' works; for true reflow use Firefox's built-in Responsive Design Mode (Ctrl+Shift+M) since Firefox has no extension API for viewport emulation.",
+  "name": "Mobile Mode - mobile on desktop (inline button)",
+  "version": "1.3.0",
+  "description": "Adds an inline, on-page floating button to toggle mobile on desktop (no popup). Chrome/Edge: true DevTools-style device reflow via the debugger API. Firefox: switches the User-Agent so UA-sniffing sites (Facebook, YouTube) serve their mobile site - for true reflow of any site use Firefox's built-in Responsive Design Mode (Ctrl+Shift+M), since Firefox gives extensions no viewport-emulation API.",
   "permissions": ["declarativeNetRequest", "storage", "tabs", "debugger"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "scripts": ["background.js"] },
-  "action": { "default_title": "Mobile Mode", "default_popup": "popup.html" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }],
+  "action": { "default_title": "Toggle Mobile Mode" },
   "browser_specific_settings": { "gecko": { "id": "mobile-mode@pyxis3.local", "strict_min_version": "128.0" } }
 }

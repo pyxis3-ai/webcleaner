@@ -1,53 +1,33 @@
 # Mobile Mode (browser extension)
 
-Get mobile sites - and true mobile **reflow** - on your desktop browser. This is the companion the userscripts in this repo provably **cannot** be (a userscript can't change a navigation's User-Agent or the viewport; an extension can).
+Adds an **inline, on-page floating button** (no popup) to flip a site to mobile on your desktop browser - the thing the userscripts in this repo provably can't do (a userscript can't change a navigation's User-Agent or the viewport; an extension can).
 
-Click the toolbar icon for a small popup with two tools:
+Tap the floating **📱** button (bottom-left, draggable) to toggle; it becomes **🖥** when mobile is on.
 
-## 1. Device mode (true reflow) - reflows ANY site
-
-Picks a phone (Pixel 8 / iPhone / iPad mini / Responsive 390px) and emulates it on the active tab using the Chrome DevTools Protocol (`Emulation.setDeviceMetricsOverride` + `setUserAgentOverride` + `setTouchEmulationEnabled`) via the `debugger` API. This is exactly what DevTools "device mode" / responsive design mode does - it changes the **real viewport**, so even normal CSS-`@media` sites reflow to their mobile layout, and the mobile User-Agent makes UA-sniffing sites serve mobile too.
-
-Trade-off: while it's active, Chrome shows a yellow **"Mobile Mode started debugging this browser"** banner. Every debugger-based emulator (and DevTools itself) shows it; it's unavoidable. Click **Off / reset this tab** to stop.
-
-## 2. Mobile UA only (no banner) - for UA-sniffing sites
-
-A global toggle that rewrites the `User-Agent` + `Sec-CH-UA-Mobile` headers to a phone via `declarativeNetRequest`. Facebook, YouTube, and other sites that pick layout by User-Agent then serve their mobile site - no banner. It does **not** reflow pure-CSS-responsive sites (the viewport stays desktop-width); use Device mode for those.
-
-## Why a userscript can't do either
-
-`m.facebook.com` on desktop returns a **301 to www before any page JavaScript runs**, decided from the request's `User-Agent` / `Sec-CH-UA-Mobile` headers:
-
-```
-GET https://m.facebook.com/   ->  301   location: https://www.facebook.com/?_rdr
-```
-
-A userscript runs inside a loaded page; it can't set those request headers and never even executes on the mobile host. And CSS `@media` is evaluated against the real window width, which a userscript can't change (CSS zoom, viewport meta, `matchMedia` spoofing, and iframes were all tested and ruled out - the big sites also block framing). Only the browser can change the User-Agent and the viewport - which is what this extension does.
-
-## What works where
+## What it does, per browser
 
 | | Chrome / Edge / Brave | Firefox |
 |---|---|---|
-| Mobile UA only (no banner) | yes | yes |
-| Device mode (true reflow) | yes (debugger API) | **no API** - use Firefox's built-in **Ctrl+Shift+M** (Responsive Design Mode), which does the same thing natively (reflow + device UA) |
+| Toggle does | **true device reflow** - DevTools-style viewport emulation via the `debugger` API (`Emulation.setDeviceMetricsOverride`), reflows **any** site | **mobile User-Agent** - via `declarativeNetRequest`, so UA-sniffing sites (Facebook, YouTube) serve their mobile site |
+| Reflow normal CSS sites? | yes | **no** - Firefox gives extensions no viewport API; use the built-in **Responsive Design Mode (`Ctrl+Shift+M`)**, which is itself an inline device bar that reflows anything |
+| Banner while active | yes (Chrome's "debugging this browser") | no |
 
-Firefox simply doesn't expose a viewport-emulation API to extensions, so the popup hides the device buttons there and points you at the built-in tool. The extension still loads and the UA toggle works.
+So on **Firefox**, the button is best for getting the *mobile site* of Facebook/YouTube; for true reflow of normal sites, `Ctrl+Shift+M` is the native, inline answer.
+
+## Why a userscript can't do this
+
+`m.facebook.com` on desktop returns a **301 to www before any page JS runs**, decided from the request's `User-Agent` / `Sec-CH-UA-Mobile` headers (traced to the wire). A userscript can't set those headers and never runs on the mobile host. And CSS `@media` is measured against the real window width, which a userscript can't change (CSS zoom, viewport meta, `matchMedia` spoofing, iframes were all tested and ruled out). Only the browser can change the UA and the viewport - which is what this extension (Chrome) or the built-in tools (Firefox `Ctrl+Shift+M`) do.
 
 ## Install (load unpacked)
 
-**Chrome / Edge / Brave:**
-1. Open `chrome://extensions` (or `edge://extensions`), turn on **Developer mode**.
-2. **Load unpacked** -> select this `mobile-mode-extension/` folder. (If you already loaded an older version, click its **reload** to accept the new `debugger` permission.)
-3. Pin it, click the icon, pick a device (or Mobile UA only).
+**Chrome / Edge / Brave:** `chrome://extensions` -> **Developer mode** -> **Load unpacked** -> this folder. (Edited the files? Click the card's **reload** to pick up changes - browsers don't auto-reload unpacked extensions.) The 📱 button appears on pages; tap it.
 
-**Firefox:**
-1. Open `about:debugging#/runtime/this-firefox`.
-2. **Load Temporary Add-on...** -> select this folder's `manifest.json`. (Temporary add-ons clear on restart; that's a Firefox dev limitation unless you sign/package it.)
-3. Click the icon -> **Mobile UA only**. For true reflow, use **Ctrl+Shift+M**.
+**Firefox:** `about:debugging#/runtime/this-firefox` -> **Load Temporary Add-on** -> pick `manifest.json`. (Temporary add-ons clear on restart unless signed.) The 📱 button appears; tap it for the mobile UA, or use `Ctrl+Shift+M` for reflow.
 
 ## Notes / limits
 
-- **Device mode is per-tab** (Chrome); Mobile UA only is global. Use **Off / reset** to clear.
-- If a device button errors, **close DevTools on that tab** first - only one debugger can attach per tab.
-- Manifest V3 background workers can sleep when idle; if emulation drops on a long-idle tab, click the device again.
+- The button is injected on every page (like the userscripts' buttons); drag it anywhere.
+- Chrome device mode is **per-tab**; the Firefox UA toggle is **global**. Tap again to turn off.
+- If toggling errors on Chrome, **close DevTools on that tab** - only one debugger can attach per tab.
+- Edited files don't take effect until you **reload** the unpacked extension.
 - Pairs with the userscripts: in Mobile mode, mobile Facebook is cleaned by **facebook-mobile-clean-feed**, YouTube ads by **youtube-skip-ads**.

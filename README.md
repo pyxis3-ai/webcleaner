@@ -37,9 +37,9 @@ Shortcuts ignore typing in text fields and never use Cmd/Ctrl. Each is editable 
 
 ## Mobile Mode (companion extension) - mobile sites on desktop
 
-A userscript fundamentally **cannot** force a mobile layout on desktop: big sites (Facebook, YouTube) decide mobile-vs-desktop from the request's **User-Agent** at the server (301 before any page script runs), and normal sites decide it from CSS `@media` against the real window width - and a userscript can change neither (only the browser can). The small **[`mobile-mode-extension/`](mobile-mode-extension/)** (Manifest V3, load-unpacked) does both, via a toolbar popup:
+A userscript fundamentally **cannot** force a mobile layout on desktop: big sites (Facebook, YouTube) decide mobile-vs-desktop from the request's **User-Agent** at the server (301 before any page script runs), and normal sites decide it from CSS `@media` against the real window width - and a userscript can change neither (only the browser can). The small **[`mobile-mode-extension/`](mobile-mode-extension/)** (Manifest V3, load-unpacked) adds an **inline, on-page floating button** (no popup) to toggle it:
 
-- **Device mode** - true DevTools-style viewport emulation (`Emulation.setDeviceMetricsOverride` via the `debugger` API) that reflows **any** site, normal CSS-responsive ones included (pick Pixel / iPhone / iPad / Responsive). Shows Chrome's debugging banner while active.
-- **Mobile UA only** - rewrites the `User-Agent` via `declarativeNetRequest` so UA-sniffing sites serve their mobile site; no banner.
+- **Chrome / Edge** - true DevTools-style viewport reflow via the `debugger` API (`Emulation.setDeviceMetricsOverride`); reflows **any** site.
+- **Firefox** - switches the `User-Agent` (`declarativeNetRequest`) so UA-sniffing sites serve their mobile site. Firefox has no extension viewport API, so for true reflow of any site use its built-in **Responsive Design Mode (`Ctrl+Shift+M`)**, itself an inline device bar.
 
 See its [README](mobile-mode-extension/README.md).
