@@ -2,7 +2,7 @@
 // @name         Site Blocker
 // @namespace    https://local/site-blocker
 // @version      1.3.1
-// @description  Block distracting / adult sites on demand. Adult always-on; a "Focus Pack" auto-blocks during work hours (Mon–Fri 9–6 by default) or whenever you flip "Focus mode now". Add/remove sites and toggle from the menu; "Allow for 5 min" snooze. For comprehensive adult blocking pair with a DNS family filter (Cloudflare 1.1.1.3 / NextDNS). Tampermonkey / Violentmonkey.
+// @description  Block distracting / adult sites on demand. Adult always-on; a "Focus Pack" auto-blocks during work hours (Mon-Fri 9-6 by default) or whenever you flip "Focus mode now". Add/remove sites and toggle from the menu; "Allow for 5 min" snooze. For comprehensive adult blocking pair with a DNS family filter (Cloudflare 1.1.1.3 / NextDNS). Tampermonkey / Violentmonkey.
 // @author       you
 // @match        *://*/*
 // @run-at       document-start
@@ -91,7 +91,7 @@
     b.innerHTML =
       '<div style="font-size:56px">⛔</div>' +
       '<div style="font-size:22px;font-weight:600">Blocked</div>' +
-      '<div style="opacity:.65;max-width:30rem">' + host + ' — ' + why + '.</div>' +
+      '<div style="opacity:.65;max-width:30rem">' + host + ' - ' + why + '.</div>' +
       '<button id="sb-allow" style="margin-top:6px;padding:10px 18px;border:0;border-radius:10px;cursor:pointer;font-size:14px;background:#2b2b30;color:#e9e9ea">Allow for ' + CONFIG.snoozeMinutes + ' minutes</button>' +
       '<div style="opacity:.4;font-size:12px">Manage filters from your userscript-manager menu</div>';
     const btn = document.getElementById('sb-allow');
@@ -136,13 +136,13 @@
       gSet('sb_custom', dedupe(next.split(/[\s,]+/).map((s) => s.trim().replace(/^www\./, '')).filter(Boolean)));
       location.reload();
     });
-    GM_registerMenuCommand((blockingOn ? '⛔ Blocking: ON' : '✅ Blocking: OFF') + ' — tap to toggle',
+    GM_registerMenuCommand((blockingOn ? '⛔ Blocking: ON' : '✅ Blocking: OFF') + ' - tap to toggle',
       () => { gSet('sb_on', !blockingOn); location.reload(); });
     GM_registerMenuCommand((blockAdult ? '☑' : '☐') + ' Adult sites',
       () => { gSet('sb_adult', !blockAdult); location.reload(); });
     GM_registerMenuCommand((blockFocus ? '☑' : '☐') + ' Focus mode now (block the Focus Pack)',
       () => { gSet('sb_focus', !blockFocus); location.reload(); });
-    GM_registerMenuCommand((scheduleOn ? '☑' : '☐') + ' Work-hours schedule (' + CONFIG.schedule.from + '–' + CONFIG.schedule.to + ', Mon–Fri)',
+    GM_registerMenuCommand((scheduleOn ? '☑' : '☐') + ' Work-hours schedule (' + CONFIG.schedule.from + '-' + CONFIG.schedule.to + ', Mon-Fri)',
       () => { gSet('sb_sched', !scheduleOn); location.reload(); });
   }
 })();

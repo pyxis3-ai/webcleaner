@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Mobile Mode — serve the mobile site on desktop",
+  "name": "Mobile Mode - serve the mobile site on desktop",
   "version": "1.0.0",
-  "description": "Toolbar toggle that rewrites the User-Agent + UA client hints to a phone, so sites (Facebook, YouTube, …) serve their real mobile interface in your desktop browser. This is the companion a userscript can't be: a userscript cannot change a navigation's User-Agent (the browser sets it before any page script runs — see the 301 from m.facebook.com); an extension can.",
+  "description": "Toolbar toggle that rewrites the User-Agent + UA client hints to a phone, so sites (Facebook, YouTube, …) serve their real mobile interface in your desktop browser. This is the companion a userscript can't be: a userscript cannot change a navigation's User-Agent (the browser sets it before any page script runs - see the 301 from m.facebook.com); an extension can.",
   "permissions": ["declarativeNetRequest", "storage", "activeTab"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },

@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Facebook Clean Feed — Real Newsfeed Only
+// @name         Facebook Clean Feed - Real Newsfeed Only
 // @namespace    https://local/fb-clean-feed
 // @version      2.7.0
 // @description  Strips Facebook down to just your real newsfeed. Hides ads/Sponsored (beats FB's character-scramble obfuscation), Stories, Reels, "Suggested for you", "People you may know", and the left & right sidebars. Strips UTM/tracking params and unwraps l.php redirect links. Greasemonkey / Tampermonkey / Violentmonkey.
@@ -27,7 +27,7 @@
     hideComposer:         true,   // the "What's on your mind?" box
     hideTopBar:           true,   // the blue bar (search, profile, notifications). NUCLEAR
     forceMostRecent:      true,   // jump Home to the chronological "Most Recent" feed (?sk=h_chr)
-    feedZoom:             1,      // enlarge the feed into the empty space around it (1 = off). WARNING: any value >1 uses CSS zoom, which corrupts the Sponsored-label geometry FB relies on for obfuscation — ads then slip through. Leave at 1 for reliable ad-hiding; only raise it if you care more about a bigger feed than blocking ads.
+    feedZoom:             1,      // enlarge the feed into the empty space around it (1 = off). WARNING: any value >1 uses CSS zoom, which corrupts the Sponsored-label geometry FB relies on for obfuscation - ads then slip through. Leave at 1 for reliable ad-hiding; only raise it if you care more about a bigger feed than blocking ads.
     showToggleButton:     true,   // floating 🧹 button (bottom-right) to switch cleaning on/off
     toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },  // Alt+Shift+F toggles cleaning on/off
     stripTracking:        true,   // strip UTM/fbclid/__tn__ etc. params and unwrap l.php redirect links
@@ -130,7 +130,7 @@
 
   const VIEWPAD = 500;
   const HEADER_BAND = 130;          // px below a story's top to scan for the Sponsored/Suggested label (FB headers got taller)
-  const CLEAN_CONFIRMATIONS = 4;    // re-read an in-view post this many sweeps before trusting it as non-ad — FB injects the scrambled "Sponsored" label a beat AFTER the post first renders, so a one-shot read misses it
+  const CLEAN_CONFIRMATIONS = 4;    // re-read an in-view post this many sweeps before trusting it as non-ad - FB injects the scrambled "Sponsored" label a beat AFTER the post first renders, so a one-shot read misses it
   function isJunkHeader(compact) {
     if (!compact) return false;
     for (const m of INCLUDE_MARKS) if (compact.includes(m)) return true;
@@ -149,7 +149,7 @@
       if (r.height < 60) continue;
       if (r.bottom < -VIEWPAD || r.top > vh + VIEWPAD) continue;
       const header = renderedText(story, r.top - 2, r.top + HEADER_BAND);
-      if (!header) continue;                    // not hydrated yet — leave unsettled, re-check next sweep
+      if (!header) continue;                    // not hydrated yet - leave unsettled, re-check next sweep
       const junk = isJunkHeader(norm(header)) ||
         (CONFIG.hideReelsTrays && story.querySelectorAll('a[href*="/reel/"]').length > 3);
       if (junk) {
@@ -163,7 +163,7 @@
 
   // The left navigation rail (Shortcuts / your groups / bookmarks) appears on EVERY
   // Facebook page, not just the feed, and FB dropped its aria-label so the CSS rule
-  // misses it. Detect it by signature — a tall element pinned to the left edge — and
+  // misses it. Detect it by signature - a tall element pinned to the left edge - and
   // hide it site-wide. Runs on all pages; the feed-only strip handles everything else.
   function hideLeftRail() {
     if (!CONFIG.hideLeftSidebar) return;
@@ -229,7 +229,7 @@
   }
   // FB reels no longer tag "Sponsored" with positioned single-character spans (the old
   // hunt found zero candidates and never fired). Reconstruct the reel's overlay text by
-  // geometry — the same un-scramble used on the feed — and look for the Sponsored mark.
+  // geometry - the same un-scramble used on the feed - and look for the Sponsored mark.
   // Memoize per reel, but keep re-checking until found: FB injects the label a beat late.
   let _reelSponId = null, _reelSpon = false, _reelTries = 0;
   function reelIsSponsored(reel) {

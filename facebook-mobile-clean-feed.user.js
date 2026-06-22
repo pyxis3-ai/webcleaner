@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Facebook Mobile — Clean Feed
+// @name         Facebook Mobile - Clean Feed
 // @namespace    https://local/fb-mobile-clean-feed
 // @version      1.1.0
-// @description  Hides Sponsored / Suggested / People-you-may-know / Reels posts on the mobile site m.facebook.com. Companion to the desktop "Facebook Clean Feed" script. NOTE: built from the documented mobile DOM, not yet device-tested — tune the markers if an ad slips through or a real post is hidden. Greasemonkey / Tampermonkey / Violentmonkey (Firefox Android / iOS Userscripts).
+// @description  Hides Sponsored / Suggested / People-you-may-know / Reels posts on the mobile site m.facebook.com. Companion to the desktop "Facebook Clean Feed" script. NOTE: built from the documented mobile DOM, not yet device-tested - tune the markers if an ad slips through or a real post is hidden. Greasemonkey / Tampermonkey / Violentmonkey (Firefox Android / iOS Userscripts).
 // @author       you
 // @match        https://m.facebook.com/*
 // @run-at       document-start

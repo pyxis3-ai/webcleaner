@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         View Mode Switcher — Desktop / Mobile
+// @name         View Mode Switcher - Desktop / Mobile
 // @namespace    https://local/view-mode-switcher
 // @version      2.1.0
-// @description  Force any site into Desktop or Mobile rendering — not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" serves the full-width mobile site (an optional centered phone-width frame is available in CONFIG). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
+// @description  Force any site into Desktop or Mobile rendering - not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" serves the full-width mobile site (an optional centered phone-width frame is available in CONFIG). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
 // @author       you
 // @match        *://*/*
 // @run-at       document-start
@@ -18,7 +18,7 @@
   'use strict';
 
   const CONFIG = {
-    showButton:     true,                                              // floating button — tap=switch, long-press=Auto, drag=move
+    showButton:     true,                                              // floating button - tap=switch, long-press=Auto, drag=move
     hotkey:         { ctrl: false, alt: true, shift: true, key: 'v' }, // Alt+Shift+V toggles Desktop/Mobile
     desktopWidth:   1280,   // viewport width forced for Desktop view (the high-value case: "request desktop site" on a phone)
     mobileWidth:    390,    // emulated device width for Mobile view (also the frame width on a desktop browser)
@@ -53,7 +53,7 @@
   const toMobile = mode === 'mobile';
   const useFrame = toMobile && !realMobile && CONFIG.frameOnDesktop;
 
-  // ---- device-signal spoofing — must run before the page's own scripts ----
+  // ---- device-signal spoofing - must run before the page's own scripts ----
   const def = (obj, prop, getter) => {
     try { Object.defineProperty(obj, prop, { configurable: true, get: getter }); return true; }
     catch (e) { return false; }
@@ -175,7 +175,7 @@
     const b = document.createElement('button');
     b.id = 'vm-btn';
     b.textContent = mode === 'desktop' ? '🖥' : mode === 'mobile' ? '📱' : '🔄';
-    b.title = 'View: ' + mode + ' — tap: switch · long-press: Auto · drag: move';
+    b.title = 'View: ' + mode + ' - tap: switch · long-press: Auto · drag: move';
     Object.assign(b.style, {
       position: 'fixed', zIndex: 2147483647, width: '40px', height: '40px', borderRadius: '50%',
       border: 'none', cursor: 'pointer', fontSize: '18px', lineHeight: '40px', padding: '0',

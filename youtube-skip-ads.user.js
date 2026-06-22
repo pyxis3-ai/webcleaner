@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         YouTube — Skip & Hide Ads
+// @name         YouTube - Skip & Hide Ads
 // @namespace    https://local/yt-skip-ads
 // @version      1.4.1
 // @description  Auto-skips YouTube video ads (clicks Skip, seeks past unskippable ones, mutes them), skips Sponsored Shorts, and hides feed/banner/overlay ads. Works on desktop and m.youtube.com. Greasemonkey / Tampermonkey / Violentmonkey. For network-level blocking, pair with uBlock Origin.

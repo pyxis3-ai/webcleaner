@@ -6,7 +6,7 @@
 //     user-agent: …Macintosh… Chrome…      (desktop)
 //     sec-ch-ua-mobile: ?0                  (Client Hint: "not mobile")
 //   …and it returns the 301 before any page JS runs. So a userscript NEVER executes
-//   on the mobile host — it can't influence this. The only lever is the request's
+//   on the mobile host - it can't influence this. The only lever is the request's
 //   User-Agent / Sec-CH-UA-Mobile headers, which only the browser can set on a
 //   navigation. A userscript can't. declarativeNetRequest (this extension) can.
 //
