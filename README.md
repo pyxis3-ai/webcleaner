@@ -43,3 +43,21 @@ A userscript fundamentally **cannot** force a mobile layout on desktop: big site
 - **Firefox** - switches the `User-Agent` (`declarativeNetRequest`) so UA-sniffing sites serve their mobile site. Firefox has no extension viewport API, so for true reflow of any site use its built-in **Responsive Design Mode (`Ctrl+Shift+M`)**, itself an inline device bar.
 
 See its [README](mobile-mode-extension/README.md).
+
+## Contributing
+
+Issues, ideas, and PRs are welcome - keep PRs focused on a single concern and follow the existing conventions.
+
+## Support & sponsors
+
+These userscripts are free, open-source, and have no tracking or ads. If they're useful to you, you can support continued development - pay what you like, once or monthly:
+
+<p align="center">
+  <a href="https://donate.stripe.com/3cI6oI7Gh1PG0eV8MJ5kk00"><img src="https://img.shields.io/badge/%20Donate%20once-pay%20what%20you%20like-635bff?logo=stripe&logoColor=white" alt="Donate once via Stripe" height="30" /></a>
+  &nbsp;
+  <a href="https://buy.stripe.com/00wbJ2f8J51S9Pv1kh5kk01"><img src="https://img.shields.io/badge/%20Sponsor%20monthly-recurring-56c4e6?logo=stripe&logoColor=white" alt="Sponsor monthly via Stripe" height="30" /></a>
+</p>
+
+## License
+
+[MIT](LICENSE) © 2026 PYXIS3
