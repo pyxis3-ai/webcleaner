@@ -1,8 +1,5 @@
 'use strict';
 
-// Inline on-page button (no popup). Injected on every top-level page. Tap to toggle
-// Mobile Mode; the background does the work (device reflow on Chrome, UA on Firefox).
-
 const api = globalThis.browser || globalThis.chrome;
 
 if (window.top === window && document.body) {
@@ -24,7 +21,6 @@ if (window.top === window && document.body) {
       + (state.hasDebugger ? '' : '  (Firefox: UA only; true reflow = Ctrl+Shift+M)');
   }
 
-  // draggable; a real drag suppresses the click
   let press = null;
   btn.addEventListener('pointerdown', (e) => {
     try { btn.setPointerCapture(e.pointerId); } catch (_) {}
@@ -48,8 +44,7 @@ if (window.top === window && document.body) {
     const r = await api.runtime.sendMessage({ cmd: 'toggle' }).catch((err) => ({ error: String(err) }));
     if (r && r.error) { alert('Mobile Mode: ' + r.error); return; }
     if (r && 'active' in r) { state.active = r.active; paint(); }
-    // Chrome reloads via the debugger and Firefox reloads the tab, so the button
-    // re-injects with fresh state on its own; this paint is just immediate feedback.
+
   });
 
   document.body.appendChild(btn);

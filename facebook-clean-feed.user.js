@@ -17,22 +17,22 @@
   'use strict';
 
   const CONFIG = {
-    hideRightSidebar:     true,   // Contacts / Sponsored / Birthdays column
-    hideLeftSidebar:      true,   // Shortcuts / Friends / Groups / Marketplace rail
-    hideSponsored:        true,   // ads (incl. the scrambled-"Sponsored" ones)
-    hideSuggested:        true,   // "Suggested for you", pages/groups for you
+    hideRightSidebar:     true,
+    hideLeftSidebar:      true,
+    hideSponsored:        true,
+    hideSuggested:        true,
     hidePeopleYouMayKnow: true,
-    hideReelsTrays:       true,   // in-feed Reels / Stories trays (keeps the NEWSFEED clean; the Reels player still works)
-    skipReelsAds:         true,   // on the full-screen Reels player, auto-skip Sponsored reels (keep watching the real ones)
-    hideComposer:         true,   // the "What's on your mind?" box
-    hideTopBar:           true,   // the blue bar (search, profile, notifications). NUCLEAR
-    forceMostRecent:      true,   // jump Home to the chronological "Most Recent" feed (?sk=h_chr)
-    feedZoom:             1,      // enlarge the feed into the empty space around it (1 = off). WARNING: any value >1 uses CSS zoom, which corrupts the Sponsored-label geometry FB relies on for obfuscation - ads then slip through. Leave at 1 for reliable ad-hiding; only raise it if you care more about a bigger feed than blocking ads.
-    showToggleButton:     true,   // floating 🧹 button (bottom-right) to switch cleaning on/off
-    toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },  // Alt+Shift+F toggles cleaning on/off
-    stripTracking:        true,   // strip UTM/fbclid/__tn__ etc. params and unwrap l.php redirect links
+    hideReelsTrays:       true,
+    skipReelsAds:         true,
+    hideComposer:         true,
+    hideTopBar:           true,
+    forceMostRecent:      true,
+    feedZoom:             1,
+    showToggleButton:     true,
+    toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },
+    stripTracking:        true,
 
-    extraJunkPhrases:     [],     // non-English ad labels, e.g. ['Patrocinado']
+    extraJunkPhrases:     [],
   };
 
   if (CONFIG.forceMostRecent) {
@@ -58,7 +58,7 @@
     const R = [P + '[data-fcf-hide]{display:none!important}'];
     if (CONFIG.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
     if (CONFIG.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
-    if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');  // left rail, every page (not just the feed)
+    if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');
     if (CONFIG.hideComposer)     R.push(P + '[role="region"][aria-label="Create a post"]{display:none!important}');
     if (CONFIG.hideTopBar)       R.push(P + '[role="banner"],' + P + '[role="navigation"][aria-label="Facebook"],' + P + '[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}');
     if (CONFIG.hideReelsTrays)   R.push(P + '[aria-label="Stories"],' + P + '[aria-label="Reels"]{display:none!important}');
@@ -129,8 +129,8 @@
   }
 
   const VIEWPAD = 500;
-  const HEADER_BAND = 130;          // px below a story's top to scan for the Sponsored/Suggested label (FB headers got taller)
-  const CLEAN_CONFIRMATIONS = 4;    // re-read an in-view post this many sweeps before trusting it as non-ad - FB injects the scrambled "Sponsored" label a beat AFTER the post first renders, so a one-shot read misses it
+  const HEADER_BAND = 130;
+  const CLEAN_CONFIRMATIONS = 4;
   function isJunkHeader(compact) {
     if (!compact) return false;
     for (const m of INCLUDE_MARKS) if (compact.includes(m)) return true;
@@ -143,28 +143,24 @@
     feed.setAttribute('data-fcf-feed', '');
     const vh = window.innerHeight;
     for (const story of feed.children) {
-      if (story.__fcf === 'hidden') continue;   // hiding is permanent
-      if (story.__fcf === 'clean') continue;    // settled non-ad (confirmed across several sweeps)
+      if (story.__fcf === 'hidden') continue;
+      if (story.__fcf === 'clean') continue;
       const r = story.getBoundingClientRect();
       if (r.height < 60) continue;
       if (r.bottom < -VIEWPAD || r.top > vh + VIEWPAD) continue;
       const header = renderedText(story, r.top - 2, r.top + HEADER_BAND);
-      if (!header) continue;                    // not hydrated yet - leave unsettled, re-check next sweep
+      if (!header) continue;
       const junk = isJunkHeader(norm(header)) ||
         (CONFIG.hideReelsTrays && story.querySelectorAll('a[href*="/reel/"]').length > 3);
       if (junk) {
         story.setAttribute('data-fcf-hide', '');
         story.__fcf = 'hidden';
       } else if ((story.__fcfSeen = (story.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
-        story.__fcf = 'clean';                  // only trust "clean" after FB has had time to inject a late "Sponsored" label
+        story.__fcf = 'clean';
       }
     }
   }
 
-  // The left navigation rail (Shortcuts / your groups / bookmarks) appears on EVERY
-  // Facebook page, not just the feed, and FB dropped its aria-label so the CSS rule
-  // misses it. Detect it by signature - a tall element pinned to the left edge - and
-  // hide it site-wide. Runs on all pages; the feed-only strip handles everything else.
   function hideLeftRail() {
     if (!CONFIG.hideLeftSidebar) return;
     for (const nav of document.querySelectorAll('[role="navigation"]:not([data-fcf-leftnav])')) {
@@ -227,10 +223,7 @@
     if (next) next.click();
     else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   }
-  // FB reels no longer tag "Sponsored" with positioned single-character spans (the old
-  // hunt found zero candidates and never fired). Reconstruct the reel's overlay text by
-  // geometry - the same un-scramble used on the feed - and look for the Sponsored mark.
-  // Memoize per reel, but keep re-checking until found: FB injects the label a beat late.
+
   let _reelSponId = null, _reelSpon = false, _reelTries = 0;
   function reelIsSponsored(reel) {
     const id = location.pathname;
@@ -279,7 +272,7 @@
   function sweep() {
     try {
       if (CONFIG.stripTracking) cleanTracking();
-      hideLeftRail();                       // remove the left rail on every page
+      hideLeftRail();
       const strip = isFeedPage();
       document.documentElement.classList.toggle('fcf-strip', strip);
       if (strip) { hardenStructure(); processStories(); }

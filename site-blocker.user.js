@@ -18,13 +18,13 @@
   'use strict';
 
   const CONFIG = {
-    blockAdultDefault: true,     // adult sites always blocked unless toggled off
-    blockFocusDefault: false,    // Focus Pack: also blocked any time you turn "Focus mode now" on
+    blockAdultDefault: true,
+    blockFocusDefault: false,
     snoozeMinutes:     5,
-    toggleHotkey:      { ctrl: false, alt: true, shift: true, key: 'b' },  // Alt+Shift+B toggles all blocking on/off
-    // Work-hours schedule: the Focus Pack is auto-blocked during these times. days: 0=Sun … 6=Sat
+    toggleHotkey:      { ctrl: false, alt: true, shift: true, key: 'b' },
+
     schedule: { enabled: true, days: [1, 2, 3, 4, 5], from: '09:00', to: '18:00' },
-    // Edit these lists freely:
+
     focus: [
       'facebook.com', 'youtube.com', 'instagram.com', 'tiktok.com', 'x.com', 'twitter.com', 'reddit.com',
       'snapchat.com', 'threads.net', 'pinterest.com', 'tumblr.com', 'linkedin.com',
@@ -36,7 +36,7 @@
     adult: ['pornhub.com', 'xvideos.com', 'xnxx.com', 'xhamster.com', 'redtube.com', 'youporn.com',
             'spankbang.com', 'onlyfans.com', 'chaturbate.com', 'stripchat.com'],
   };
-  // Heuristic for the long tail of adult hostnames (kept narrow to avoid false positives like "sussex").
+
   const ADULT_RE = /(porn|xvideos|xhamster|hentai|camsoda|chaturbate|brazzers|onlyfans|nsfw|sexcam|sextube|camgirl)/i;
 
   const GM_OK = typeof GM_getValue === 'function' && typeof GM_setValue === 'function';
@@ -47,9 +47,9 @@
   const blockAdult  = gGet('sb_adult', CONFIG.blockAdultDefault);
   const blockFocus  = gGet('sb_focus', CONFIG.blockFocusDefault);
   const scheduleOn  = gGet('sb_sched', CONFIG.schedule.enabled);
-  const asList = (v) => (Array.isArray(v) ? v : []);     // tolerate corrupted / legacy storage
-  const custom = asList(gGet('sb_custom', []));   // sites you added from the menu
-  const allow  = asList(gGet('sb_allow', []));    // sites you removed / always allow
+  const asList = (v) => (Array.isArray(v) ? v : []);
+  const custom = asList(gGet('sb_custom', []));
+  const allow  = asList(gGet('sb_allow', []));
   const dedupe = (arr) => [...new Set(arr)];
 
   const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };

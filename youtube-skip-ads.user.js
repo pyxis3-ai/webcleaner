@@ -17,13 +17,13 @@
   'use strict';
 
   const CONFIG = {
-    skipVideoAds:       true,   // auto-skip pre/mid-roll video ads
-    skipShortsAds:      true,   // auto-skip Sponsored Shorts
-    hideFeedAds:        true,   // promoted videos / in-feed ad slots
-    hideBanners:        true,   // masthead, overlay banners, companion / side ads
-    muteAds:            true,   // mute while an ad is being skipped
-    dismissAntiAdblock: true,   // remove YouTube's "ad blockers are not allowed" popup (mainly if you also run uBlock)
-    toggleHotkey:       { ctrl: false, alt: true, shift: true, key: 'y' },  // Alt+Shift+Y turns this script on/off
+    skipVideoAds:       true,
+    skipShortsAds:      true,
+    hideFeedAds:        true,
+    hideBanners:        true,
+    muteAds:            true,
+    dismissAntiAdblock: true,
+    toggleHotkey:       { ctrl: false, alt: true, shift: true, key: 'y' },
   };
 
   let enabled = true;
@@ -43,7 +43,6 @@
   ];
   const FEED_WRAPPERS = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ytd-item-section-renderer, ytm-rich-item-renderer, ytm-item-section-renderer';
 
-  // YouTube flags an active ad by putting one of these classes on the player element.
   const VIDEO_AD_CLASSES = ['ad-showing', 'ad-interrupting'];
   const SHORT_AD_CLASSES = ['ad-showing', 'ad-interrupting', 'ad-created'];
   const hasAnyClass = (el, classes) => !!el && classes.some((c) => el.classList.contains(c));

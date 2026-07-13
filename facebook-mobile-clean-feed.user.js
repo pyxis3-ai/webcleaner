@@ -16,12 +16,12 @@
   'use strict';
 
   const CONFIG = {
-    hideSponsored:        true,   // ads
-    hideSuggested:        true,   // "Suggested for you"
+    hideSponsored:        true,
+    hideSuggested:        true,
     hidePeopleYouMayKnow: true,
-    hideReels:            true,   // in-feed Reels trays
-    extraJunkPhrases:     [],     // non-English equivalents, e.g. ['Patrocinado']
-    toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },  // Alt+Shift+F toggles cleaning on/off
+    hideReels:            true,
+    extraJunkPhrases:     [],
+    toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },
   };
 
   const norm = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[^a-z]/g, '');

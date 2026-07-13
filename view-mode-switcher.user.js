@@ -18,42 +18,37 @@
   'use strict';
 
   const CONFIG = {
-    showButton:     true,                                              // floating button - tap=switch, long-press=Auto, drag=move
-    hotkey:         { ctrl: false, alt: true, shift: true, key: 'v' }, // Alt+Shift+V toggles Desktop/Mobile
-    desktopWidth:   1280,   // viewport width forced for Desktop view (the high-value case: "request desktop site" on a phone)
-    mobileWidth:    390,    // emulated device width for Mobile view (also the frame width on a desktop browser)
-    mobileHeight:   844,    // emulated device height (used for the spoofed screen/innerHeight)
-    frameOnDesktop: false,  // desktop Mobile view fills the window (full-width mobile site); set true for a centered phone-width frame instead
-    spoofUA:        true,   // override navigator.userAgent / platform / userAgentData
-    spoofTouch:     true,   // override maxTouchPoints + ontouchstart so touch detection flips
-    spoofMedia:     true,   // override window.matchMedia (+ innerWidth/screen in the frame) so JS-driven responsive layouts switch
-    longPressMs:    500,    // hold the button this long to reset to Auto
+    showButton:     true,
+    hotkey:         { ctrl: false, alt: true, shift: true, key: 'v' },
+    desktopWidth:   1280,
+    mobileWidth:    390,
+    mobileHeight:   844,
+    frameOnDesktop: false,
+    spoofUA:        true,
+    spoofTouch:     true,
+    spoofMedia:     true,
+    longPressMs:    500,
     mobileUA:  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
     desktopUA: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   };
 
-  // ---- mode resolution (a per-site choice overrides the global default) ----
   const GM_OK = typeof GM_getValue === 'function';
   const gGet = (k, d) => (GM_OK ? GM_getValue(k, d) : d);
   const gSet = (k, v) => { if (GM_OK) GM_setValue(k, v); };
   const siteMode = (() => { try { return localStorage.getItem('vm_mode') || ''; } catch (e) { return ''; } })();
   const setSite = (m) => { try { localStorage.setItem('vm_mode', m); } catch (e) {} };
   const globalMode = gGet('vm_global', 'auto');
-  const mode = siteMode || globalMode;   // 'auto' | 'desktop' | 'mobile'
+  const mode = siteMode || globalMode;
 
-  // Capture what the REAL browser is before we spoof anything. A desktop browser
-  // cannot shrink its own OS window from a @grant-none script, so Mobile view there
-  // is delivered as a centered phone-width frame instead of a real reflow.
   const realUA = navigator.userAgent;
   const uaData = navigator.userAgentData;
   const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(realUA) ||
                      /iPad/.test(realUA) ||
-                     (/Macintosh/.test(realUA) && navigator.maxTouchPoints > 1) ||   // iPadOS reports its UA as "Macintosh"
+                     (/Macintosh/.test(realUA) && navigator.maxTouchPoints > 1) ||
                      (!!uaData && uaData.mobile === true);
   const toMobile = mode === 'mobile';
   const useFrame = toMobile && !realMobile && CONFIG.frameOnDesktop;
 
-  // ---- device-signal spoofing - must run before the page's own scripts ----
   const def = (obj, prop, getter) => {
     try { Object.defineProperty(obj, prop, { configurable: true, get: getter }); return true; }
     catch (e) { return false; }
@@ -70,7 +65,7 @@
       if (q.includes('pointer: fine')   || q.includes('any-pointer: fine'))   return !coarse;
       if (q.includes('hover: none'))  return coarse;
       if (q.includes('hover: hover')) return !coarse;
-      return null;   // not a query we emulate → delegate to the real engine
+      return null;
     };
     window.matchMedia = function (query) {
       const verdict = decide(query);
@@ -109,8 +104,7 @@
     if (CONFIG.spoofMedia) {
       const emuW = toMobile ? CONFIG.mobileWidth : CONFIG.desktopWidth;
       installMatchMedia(emuW, toMobile);
-      // Only override the reported size when we're emulating in a frame; lying about
-      // innerWidth when it doesn't match the real paint breaks scroll/hit-test math.
+
       if (useFrame) {
         def(window, 'innerWidth',  () => CONFIG.mobileWidth);
         def(window, 'innerHeight', () => CONFIG.mobileHeight);
@@ -123,7 +117,6 @@
     }
   }
 
-  // ---- viewport (the real lever on a mobile browser) ----------------------
   function applyViewport() {
     if (mode === 'auto') return;
     document.querySelectorAll('meta[name="viewport"]').forEach((el) => { if (!el.hasAttribute('data-vm')) el.remove(); });
@@ -139,7 +132,6 @@
       : 'width=device-width, initial-scale=1');
   }
 
-  // ---- desktop phone-frame (a desktop browser can't shrink its own window) -
   function applyFrame() {
     if (!useFrame || document.getElementById('vm-frame-style')) return;
     const w = CONFIG.mobileWidth;
@@ -154,7 +146,6 @@
     document.documentElement.classList.add('vm-framed');
   }
 
-  // ---- apply everything ASAP, then re-assert as the page mutates ----------
   spoofSignals();
   applyViewport();
   if (mode !== 'auto') {

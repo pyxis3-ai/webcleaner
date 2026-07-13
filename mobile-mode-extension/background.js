@@ -1,12 +1,5 @@
 'use strict';
 
-// Cross-browser (Chrome/Edge + Firefox). Driven by an inline on-page button
-// (content.js) - no popup. One toggle, "best mobile the browser allows":
-//   - Chrome/Edge: true device-mode reflow via the debugger API (Emulation.*).
-//   - Firefox: rewrite the User-Agent (declarativeNetRequest) so UA-sniffing sites
-//     serve their mobile site. Firefox has no extension viewport API, so true reflow
-//     there is the built-in Responsive Design Mode (Ctrl+Shift+M).
-
 const api = globalThis.browser || globalThis.chrome;
 const HAS_DEBUGGER = !!(globalThis.chrome && globalThis.chrome.debugger);
 
@@ -17,7 +10,6 @@ const PHONE = {
   ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
 };
 
-// --- Firefox / lightweight: UA rewrite via declarativeNetRequest -------------
 function uaRule(ua) {
   return {
     id: RULE_ID, priority: 1,
@@ -34,8 +26,7 @@ async function setUaOnly(on) {
 }
 async function uaOn() { const { uaOnly } = await api.storage.local.get('uaOnly'); return !!uaOnly; }
 
-// --- Chrome/Edge: true device emulation via chrome.debugger -----------------
-const emulated = new Set(); // tabIds currently emulated
+const emulated = new Set();
 function send(tabId, method, params) {
   return new Promise((resolve, reject) => {
     chrome.debugger.sendCommand({ tabId }, method, params || {}, (res) => {
@@ -77,7 +68,6 @@ if (HAS_DEBUGGER) {
 }
 api.tabs.onRemoved.addListener((tabId) => emulated.delete(tabId));
 
-// --- shared toggle -----------------------------------------------------------
 async function isActive(tabId) { return HAS_DEBUGGER ? (tabId != null && emulated.has(tabId)) : await uaOn(); }
 async function doToggle(tabId) {
   if (HAS_DEBUGGER) {
@@ -92,7 +82,6 @@ async function doToggle(tabId) {
   return { active: on };
 }
 
-// inline button (content script) + toolbar icon both drive the same toggle
 api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     let tabId = sender && sender.tab && sender.tab.id;
