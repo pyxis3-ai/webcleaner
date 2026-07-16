@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Site Blocker
 // @namespace    https://local/site-blocker
-// @version      1.3.2
+// @version      1.3.3
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
@@ -137,7 +137,8 @@
       () => { gSet('sb_adult', !blockAdult); location.reload(); });
     GM_registerMenuCommand((blockFocus ? '☑' : '☐') + ' Focus mode now (block the Focus Pack)',
       () => { gSet('sb_focus', !blockFocus); location.reload(); });
-    GM_registerMenuCommand((scheduleOn ? '☑' : '☐') + ' Work-hours schedule (' + CONFIG.schedule.from + '-' + CONFIG.schedule.to + ', Mon-Fri)',
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    GM_registerMenuCommand((scheduleOn ? '☑' : '☐') + ' Work-hours schedule (' + CONFIG.schedule.from + '-' + CONFIG.schedule.to + ', ' + CONFIG.schedule.days.map((d) => DAY_NAMES[d]).join(' ') + ')',
       () => { gSet('sb_sched', !scheduleOn); location.reload(); });
   }
 })();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         View Mode Switcher
 // @namespace    https://local/view-mode-switcher
-// @version      2.2.0
+// @version      2.2.1
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
@@ -55,14 +55,16 @@
     const native = window.matchMedia ? window.matchMedia.bind(window) : null;
     const decide = (qRaw) => {
       const q = String(qRaw).toLowerCase();
+      let known = null;
+      const clause = (ok) => { if (known !== false) known = ok; };
       let m;
-      if ((m = q.match(/min-width:\s*(\d+(?:\.\d+)?)px/))) return emuWidth >= parseFloat(m[1]);
-      if ((m = q.match(/max-width:\s*(\d+(?:\.\d+)?)px/))) return emuWidth <= parseFloat(m[1]);
-      if (q.includes('pointer: coarse') || q.includes('any-pointer: coarse')) return coarse;
-      if (q.includes('pointer: fine')   || q.includes('any-pointer: fine'))   return !coarse;
-      if (q.includes('hover: none'))  return coarse;
-      if (q.includes('hover: hover')) return !coarse;
-      return null;
+      if ((m = q.match(/min-width:\s*(\d+(?:\.\d+)?)px/))) clause(emuWidth >= parseFloat(m[1]));
+      if ((m = q.match(/max-width:\s*(\d+(?:\.\d+)?)px/))) clause(emuWidth <= parseFloat(m[1]));
+      if (q.includes('pointer: coarse') || q.includes('any-pointer: coarse')) clause(coarse);
+      if (q.includes('pointer: fine')   || q.includes('any-pointer: fine'))   clause(!coarse);
+      if (q.includes('hover: none'))  clause(coarse);
+      if (q.includes('hover: hover')) clause(!coarse);
+      return known;
     };
     window.matchMedia = function (query) {
       const verdict = decide(query);

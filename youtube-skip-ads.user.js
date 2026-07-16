@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Skip Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.5.1
+// @version      1.5.2
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @run-at       document-start
@@ -38,7 +38,7 @@
     'ytm-companion-slot-renderer', 'ytm-promoted-video-renderer', 'ytm-search-pyv-renderer',
     'ytm-promoted-sparkles-web-renderer', 'ad-slot-renderer',
   ];
-  const FEED_WRAPPERS = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ytd-item-section-renderer, ytm-rich-item-renderer, ytm-item-section-renderer';
+  const FEED_WRAPPERS = 'ytd-rich-item-renderer, ytd-rich-section-renderer, ytm-rich-item-renderer, ytm-item-section-renderer';
 
   const VIDEO_AD_CLASSES = ['ad-showing', 'ad-interrupting'];
   const SHORT_AD_CLASSES = ['ad-showing', 'ad-interrupting', 'ad-created'];
@@ -109,7 +109,7 @@
     if (!CONFIG.dismissAntiAdblock) return;
     const enforce = document.querySelector('ytd-enforcement-message-view-model');
     if (!enforce) return;
-    const dialog = enforce.closest('tp-yt-paper-dialog, ytd-popup-container');
+    const dialog = enforce.closest('tp-yt-paper-dialog');
     if (dialog) dialog.remove(); else enforce.remove();
     const backdrop = document.querySelector('tp-yt-iron-overlay-backdrop');
     if (backdrop) backdrop.remove();
