@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed
 // @namespace    https://local/fb-clean-feed
-// @version      3.1.0
+// @version      3.2.0
 // @match        https://www.facebook.com/*
 // @match        https://web.facebook.com/*
 // @match        https://m.facebook.com/*
@@ -41,8 +41,8 @@
     }
   }
 
-  const norm = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[^a-z]/g, '');
-  const SPONSORED_MARKS = ['sponsored', 'paidpartnership', 'publicidad', 'patrocinado', 'sponsoris', 'commandit', 'gesponsert', 'sponsorizzat', 'gesponsord', 'bersponsor', 'sponsorlu', 'sponsorowan', 'sponsrad', 'sponset', 'sponsoreret'];
+  const norm = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[^\p{L}]/gu, '');
+  const SPONSORED_MARKS = ['sponsored', 'paidpartnership', 'publicidad', 'patrocinado', 'sponsoris', 'commandit', 'gesponsert', 'sponsorizzat', 'gesponsord', 'bersponsor', 'sponsorlu', 'sponsorowan', 'sponsrad', 'sponset', 'sponsoreret', 'ممول', 'ממומן', 'реклама', '広告', '광고', '赞助', '贊助', 'χορηγούμενη'].map(norm);
   const INCLUDE_MARKS = [
     ...(CONFIG.hideSponsored ? SPONSORED_MARKS : []),
     ...(CONFIG.hideSuggested ? ['suggestedforyou', 'suggestedpost', 'pagesforyou', 'pagesyoumaylike', 'groupsyoumaylike'] : []),
@@ -52,12 +52,9 @@
   const EXACT_MARKS = CONFIG.hideReelsTrays ? ['reels', 'reelsandshortvideos', 'stories'] : [];
 
   function injectStyle() {
-    const R = [];
-    if (IS_MOBILE) {
-      R.push('html:not(.fcf-off) [data-fcf-hide]{display:none!important}');
-    } else {
+    const R = ['html:not(.fcf-off) [data-fcf-hide]{display:none!important}'];
+    if (!IS_MOBILE) {
       const P = 'html.fcf-strip:not(.fcf-off) ';
-      R.push(P + '[data-fcf-hide]{display:none!important}');
       if (CONFIG.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
       if (CONFIG.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
       if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');
@@ -176,7 +173,7 @@
       for (const nav of document.querySelectorAll('[role="navigation"]')) {
         const r = nav.getBoundingClientRect();
         if (r.height > 350 && r.width > 120 && r.right <= mr.left + 8)
-          nav.setAttribute('data-fcf-hide', '');
+          nav.setAttribute('data-fcf-leftnav', '');
       }
     }
   }
@@ -338,14 +335,17 @@
     const p = location.pathname;
     return p === '/' || p === '/home.php';
   }
+  function isCleanPage() {
+    const p = location.pathname.replace(/\/$/, '');
+    return isFeedPage() || p === '/groups/feed' || p === '/watch' || /^\/groups\/[^/]+$/.test(p);
+  }
   function sweep() {
     try {
       if (CONFIG.stripTracking) cleanTracking();
       if (IS_MOBILE) { sweepMobile(); return; }
       hideLeftRail();
-      const strip = isFeedPage();
-      document.documentElement.classList.toggle('fcf-strip', strip);
-      if (strip) { hardenStructure(); processStories(); }
+      document.documentElement.classList.toggle('fcf-strip', isFeedPage());
+      if (isCleanPage()) { hardenStructure(); processStories(); }
       handleReels();
     } catch (e) { console.warn('[FCF]', e); }
   }

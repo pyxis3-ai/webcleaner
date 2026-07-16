@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         YouTube Skip Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.5.2
+// @version      1.6.0
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
+// @match        https://music.youtube.com/*
 // @run-at       document-start
 // @grant        none
 // @noframes
