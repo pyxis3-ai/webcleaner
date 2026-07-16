@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed
 // @namespace    https://local/fb-clean-feed
-// @version      3.0.0
+// @version      3.1.0
 // @match        https://www.facebook.com/*
 // @match        https://web.facebook.com/*
 // @match        https://m.facebook.com/*
@@ -42,7 +42,7 @@
   }
 
   const norm = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[^a-z]/g, '');
-  const SPONSORED_MARKS = ['sponsored', 'paidpartnership'];
+  const SPONSORED_MARKS = ['sponsored', 'paidpartnership', 'publicidad', 'patrocinado', 'sponsoris', 'commandit', 'gesponsert', 'sponsorizzat', 'gesponsord', 'bersponsor', 'sponsorlu', 'sponsorowan', 'sponsrad', 'sponset', 'sponsoreret'];
   const INCLUDE_MARKS = [
     ...(CONFIG.hideSponsored ? SPONSORED_MARKS : []),
     ...(CONFIG.hideSuggested ? ['suggestedforyou', 'suggestedpost', 'pagesforyou', 'pagesyoumaylike', 'groupsyoumaylike'] : []),

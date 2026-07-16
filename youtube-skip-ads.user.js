@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Skip Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.5.0
+// @version      1.5.1
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @run-at       document-start
@@ -78,7 +78,7 @@
     const video = document.querySelector('.html5-video-player video') || document.querySelector('video');
     const adShowing = hasAnyClass(player, VIDEO_AD_CLASSES);
     if (adShowing) {
-      const skip = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-ad-skip-button-container button');
+      const skip = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, .ytp-ad-skip-button-container button, .ytp-ad-skip-button-slot button, .ytp-ad-skip-button-slot');
       if (skip) skip.click();
       if (video) {
         if (CONFIG.muteAds && !video.muted) { video.muted = true; mutedByUs = true; }
