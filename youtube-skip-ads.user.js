@@ -1,16 +1,12 @@
 // ==UserScript==
-// @name         YouTube - Skip & Hide Ads
+// @name         YouTube Skip Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.4.1
-// @description  Auto-skips YouTube video ads (clicks Skip, seeks past unskippable ones, mutes them), skips Sponsored Shorts, and hides feed/banner/overlay ads. Works on desktop and m.youtube.com. Greasemonkey / Tampermonkey / Violentmonkey. For network-level blocking, pair with uBlock Origin.
-// @author       you
+// @version      1.5.0
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @run-at       document-start
 // @grant        none
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
-// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
 // ==/UserScript==
 
 (function () {
@@ -23,6 +19,7 @@
     hideBanners:        true,
     muteAds:            true,
     dismissAntiAdblock: true,
+    showToggleButton:   true,
     toggleHotkey:       { ctrl: false, alt: true, shift: true, key: 'y' },
   };
 
@@ -51,12 +48,19 @@
     const rules = [];
     if (CONFIG.hideBanners) rules.push(...BANNER_HIDE);
     if (CONFIG.hideFeedAds) rules.push(...FEED_HIDE, '[data-yt-hide]');
-    if (!rules.length) return;
-    const style = document.createElement('style');
-    style.id = 'yt-skip-ads';
-    style.textContent = rules.join(',') + '{display:none!important}';
-    (document.head || document.documentElement).appendChild(style);
-    styleEl = style;
+    if (rules.length) {
+      const style = document.createElement('style');
+      style.id = 'yt-skip-ads';
+      style.textContent = rules.join(',') + '{display:none!important}';
+      (document.head || document.documentElement).appendChild(style);
+      styleEl = style;
+    }
+    if (CONFIG.showToggleButton) {
+      const ui = document.createElement('style');
+      ui.id = 'yt-skip-ads-ui';
+      ui.textContent = '#yt-toggle{position:fixed;z-index:2147483647;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;font-size:18px;line-height:40px;padding:0;background:#fff;color:#111;box-shadow:0 2px 10px rgba(0,0,0,.35);touch-action:none;transition:transform .1s}';
+      (document.head || document.documentElement).appendChild(ui);
+    }
   }
 
   function hideFeedWrappers() {
@@ -121,7 +125,60 @@
   function toggleEnabled() {
     enabled = !enabled;
     if (styleEl) styleEl.disabled = !enabled;
+    const b = document.getElementById('yt-toggle');
+    if (b) b.style.opacity = enabled ? '1' : '0.4';
   }
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function makeDraggable(btn, storeKey, onTap) {
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch (e) {}
+    if (pos && typeof pos.left === 'number') {
+      btn.style.left = clamp(pos.left, 0, window.innerWidth - 40) + 'px';
+      btn.style.top = clamp(pos.top, 0, window.innerHeight - 40) + 'px';
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+    }
+    let press = null;
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      btn.style.transform = 'scale(0.9)';
+      press = { sx: e.clientX, sy: e.clientY, moved: false };
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!press) return;
+      if (!press.moved && Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 6) press.moved = true;
+      if (press.moved) {
+        btn.style.left = clamp(e.clientX - 20, 0, window.innerWidth - 40) + 'px';
+        btn.style.top = clamp(e.clientY - 20, 0, window.innerHeight - 40) + 'px';
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+      }
+    });
+    btn.addEventListener('pointerup', (e) => {
+      btn.style.transform = '';
+      if (!press) return;
+      const p = press; press = null;
+      try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (p.moved) {
+        try { localStorage.setItem(storeKey, JSON.stringify({ left: parseInt(btn.style.left, 10), top: parseInt(btn.style.top, 10) })); } catch (e2) {}
+        return;
+      }
+      onTap();
+    });
+  }
+
+  function addToggle() {
+    if (!CONFIG.showToggleButton || !document.body || document.getElementById('yt-toggle')) return;
+    const b = document.createElement('button');
+    b.id = 'yt-toggle';
+    b.textContent = '⏭';
+    b.title = 'YouTube Skip Ads - tap: toggle · drag: move';
+    makeDraggable(b, 'yt_pos', toggleEnabled);
+    document.body.appendChild(b);
+  }
+
   let scheduled = false;
   function schedule() {
     if (scheduled) return;
@@ -131,6 +188,7 @@
 
   function start() {
     tick();
+    addToggle();
     new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     setInterval(tick, 250);
   }

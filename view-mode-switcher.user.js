@@ -1,17 +1,13 @@
 // ==UserScript==
-// @name         View Mode Switcher - Desktop / Mobile
+// @name         View Mode Switcher
 // @namespace    https://local/view-mode-switcher
-// @version      2.1.0
-// @description  Force any site into Desktop or Mobile rendering - not just the viewport meta, but the device signals sites actually read: user-agent, touch, and matchMedia. On a desktop browser, "Mobile" serves the full-width mobile site (an optional centered phone-width frame is available in CONFIG). Remembers your choice per site. Draggable button, Alt+Shift+V, or the menu. Tampermonkey / Violentmonkey.
-// @author       you
+// @version      2.2.0
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
-// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
 // ==/UserScript==
 
 (function () {
@@ -19,10 +15,11 @@
 
   const CONFIG = {
     showButton:     true,
-    hotkey:         { ctrl: false, alt: true, shift: true, key: 'v' },
+    toggleHotkey:   { ctrl: false, alt: true, shift: true, key: 'v' },
     desktopWidth:   1280,
-    mobileWidth:    390,
-    mobileHeight:   844,
+    mobileWidth:    412,
+    mobileHeight:   915,
+    mobileDpr:      2.625,
     frameOnDesktop: false,
     spoofUA:        true,
     spoofTouch:     true,
@@ -32,7 +29,7 @@
     desktopUA: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   };
 
-  const GM_OK = typeof GM_getValue === 'function';
+  const GM_OK = typeof GM_getValue === 'function' && typeof GM_setValue === 'function';
   const gGet = (k, d) => (GM_OK ? GM_getValue(k, d) : d);
   const gSet = (k, v) => { if (GM_OK) GM_setValue(k, v); };
   const siteMode = (() => { try { return localStorage.getItem('vm_mode') || ''; } catch (e) { return ''; } })();
@@ -112,7 +109,7 @@
         def(screen,  'height',      () => CONFIG.mobileHeight);
         def(screen,  'availWidth',  () => CONFIG.mobileWidth);
         def(screen,  'availHeight', () => CONFIG.mobileHeight);
-        def(window,  'devicePixelRatio', () => 3);
+        def(window,  'devicePixelRatio', () => CONFIG.mobileDpr);
       }
     }
   }
@@ -223,7 +220,7 @@
   else document.addEventListener('DOMContentLoaded', addButton);
 
   window.addEventListener('keydown', (e) => {
-    const h = CONFIG.hotkey;
+    const h = CONFIG.toggleHotkey;
     if (e.metaKey || e.ctrlKey !== !!h.ctrl || e.altKey !== !!h.alt || e.shiftKey !== !!h.shift) return;
     if ((e.key || '').toLowerCase() !== h.key.toLowerCase()) return;
     const el = e.target;

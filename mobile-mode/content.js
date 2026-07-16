@@ -21,6 +21,19 @@ if (window.top === window && document.body) {
       + (state.hasDebugger ? '' : '  (Firefox: UA only; true reflow = Ctrl+Shift+M)');
   }
 
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  try {
+    const got = api.storage.local.get('mmPos');
+    if (got && got.then) got.then((r) => {
+      const p = r && r.mmPos;
+      if (p && typeof p.left === 'number') {
+        btn.style.left = clamp(p.left, 0, window.innerWidth - 40) + 'px';
+        btn.style.top = clamp(p.top, 0, window.innerHeight - 40) + 'px';
+        btn.style.bottom = 'auto';
+      }
+    }, () => {});
+  } catch (_) {}
+
   let press = null;
   btn.addEventListener('pointerdown', (e) => {
     try { btn.setPointerCapture(e.pointerId); } catch (_) {}
@@ -31,8 +44,8 @@ if (window.top === window && document.body) {
     if (!press) return;
     if (!press.moved && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) press.moved = true;
     if (press.moved) {
-      btn.style.left = Math.max(0, Math.min(window.innerWidth - 40, e.clientX - 20)) + 'px';
-      btn.style.top = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - 20)) + 'px';
+      btn.style.left = clamp(e.clientX - 20, 0, window.innerWidth - 40) + 'px';
+      btn.style.top = clamp(e.clientY - 20, 0, window.innerHeight - 40) + 'px';
       btn.style.bottom = 'auto';
     }
   });
@@ -40,11 +53,16 @@ if (window.top === window && document.body) {
     btn.style.transform = '';
     const wasDrag = press && press.moved; press = null;
     try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
-    if (wasDrag) return;
+    if (wasDrag) {
+      try {
+        const saved = api.storage.local.set({ mmPos: { left: parseInt(btn.style.left, 10), top: parseInt(btn.style.top, 10) } });
+        if (saved && saved.catch) saved.catch(() => {});
+      } catch (_) {}
+      return;
+    }
     const r = await api.runtime.sendMessage({ cmd: 'toggle' }).catch((err) => ({ error: String(err) }));
     if (r && r.error) { alert('Mobile Mode: ' + r.error); return; }
     if (r && 'active' in r) { state.active = r.active; paint(); }
-
   });
 
   document.body.appendChild(btn);

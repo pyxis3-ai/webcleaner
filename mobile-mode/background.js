@@ -94,7 +94,7 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   })();
   return true;
 });
-if (api.action && api.action.onClicked) api.action.onClicked.addListener((tab) => doToggle(tab && tab.id));
+api.action.onClicked.addListener((tab) => doToggle(tab && tab.id));
 
 api.runtime.onStartup.addListener(async () => setUaOnly(await uaOn()));
 api.runtime.onInstalled.addListener(async () => setUaOnly(await uaOn()));

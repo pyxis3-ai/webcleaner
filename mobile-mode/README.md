@@ -12,7 +12,7 @@ Tap the floating **📱** button (bottom-left, draggable) to toggle; it becomes 
 | Reflow normal CSS sites? | yes | **no** - Firefox gives extensions no viewport API; use the built-in **Responsive Design Mode (`Ctrl+Shift+M`)**, which is itself an inline device bar that reflows anything |
 | Banner while active | yes (Chrome's "debugging this browser") | no |
 
-So on **Firefox**, the button is best for getting the *mobile site* of Facebook/YouTube; for true reflow of normal sites, `Ctrl+Shift+M` is the native, inline answer.
+So on **Firefox**, the button is best for getting the *mobile site* of Facebook/YouTube; for true reflow of normal sites, `Ctrl+Shift+M` (macOS: `Cmd+Opt+M`) is the native, inline answer.
 
 ## Why a userscript can't do this
 
@@ -26,8 +26,8 @@ So on **Firefox**, the button is best for getting the *mobile site* of Facebook/
 
 ## Notes / limits
 
-- The button is injected on every page (like the userscripts' buttons); drag it anywhere.
+- The button is injected on every page (like the userscripts' buttons); drag it anywhere - it remembers its position.
 - Chrome device mode is **per-tab**; the Firefox UA toggle is **global**. Tap again to turn off.
 - If toggling errors on Chrome, **close DevTools on that tab** - only one debugger can attach per tab.
 - Edited files don't take effect until you **reload** the unpacked extension.
-- Pairs with the userscripts: in Mobile mode, mobile Facebook is cleaned by **facebook-mobile-clean-feed**, YouTube ads by **youtube-skip-ads**.
+- Pairs with the userscripts: in Mobile mode, mobile Facebook is cleaned by **facebook-clean-feed** (its `m.facebook.com` branch), YouTube ads by **youtube-skip-ads**.

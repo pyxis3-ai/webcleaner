@@ -1,17 +1,13 @@
 // ==UserScript==
 // @name         Site Blocker
 // @namespace    https://local/site-blocker
-// @version      1.3.1
-// @description  Block distracting / adult sites on demand. Adult always-on; a "Focus Pack" auto-blocks during work hours (Mon-Fri 9-6 by default) or whenever you flip "Focus mode now". Add/remove sites and toggle from the menu; "Allow for 5 min" snooze. For comprehensive adult blocking pair with a DNS family filter (Cloudflare 1.1.1.3 / NextDNS). Tampermonkey / Violentmonkey.
-// @author       you
+// @version      1.3.2
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/site-blocker.user.js
-// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/site-blocker.user.js
 // ==/UserScript==
 
 (function () {
@@ -51,11 +47,12 @@
   const custom = asList(gGet('sb_custom', []));
   const allow  = asList(gGet('sb_allow', []));
   const dedupe = (arr) => [...new Set(arr)];
+  const toggleAll = () => { gSet('sb_on', !blockingOn); location.reload(); };
 
   const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
   function inSchedule() {
     const s = CONFIG.schedule;
-    if (!scheduleOn || !s.enabled || !s.days.includes(new Date().getDay())) return false;
+    if (!scheduleOn || !s.days.includes(new Date().getDay())) return false;
     const now = new Date();
     const cur = now.getHours() * 60 + now.getMinutes();
     const from = toMin(s.from), to = toMin(s.to);
@@ -115,8 +112,7 @@
     const el = e.target;
     if (el && (el.isContentEditable || /^(input|textarea|select)$/i.test(el.tagName || ''))) return;
     e.preventDefault();
-    gSet('sb_on', !blockingOn);
-    location.reload();
+    toggleAll();
   }, true);
 
   if (typeof GM_registerMenuCommand === 'function') {
@@ -136,8 +132,7 @@
       gSet('sb_custom', dedupe(next.split(/[\s,]+/).map((s) => s.trim().replace(/^www\./, '')).filter(Boolean)));
       location.reload();
     });
-    GM_registerMenuCommand((blockingOn ? '⛔ Blocking: ON' : '✅ Blocking: OFF') + ' - tap to toggle',
-      () => { gSet('sb_on', !blockingOn); location.reload(); });
+    GM_registerMenuCommand((blockingOn ? '⛔ Blocking: ON' : '✅ Blocking: OFF') + ' - tap to toggle', toggleAll);
     GM_registerMenuCommand((blockAdult ? '☑' : '☐') + ' Adult sites',
       () => { gSet('sb_adult', !blockAdult); location.reload(); });
     GM_registerMenuCommand((blockFocus ? '☑' : '☐') + ' Focus mode now (block the Focus Pack)',

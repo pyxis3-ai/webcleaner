@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Mobile Mode",
+  "version": "1.4.0",
+  "permissions": ["declarativeNetRequest", "storage", "debugger"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "scripts": ["background.js"] },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"], "run_at": "document_idle" }],
+  "action": {},
+  "browser_specific_settings": { "gecko": { "id": "mobile-mode@pyxis3.local", "strict_min_version": "128.0" } }
+}

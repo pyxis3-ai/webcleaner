@@ -1,44 +1,42 @@
 // ==UserScript==
-// @name         Facebook Clean Feed - Real Newsfeed Only
+// @name         Facebook Clean Feed
 // @namespace    https://local/fb-clean-feed
-// @version      2.7.0
-// @description  Strips Facebook down to just your real newsfeed. Hides ads/Sponsored (beats FB's character-scramble obfuscation), Stories, Reels, "Suggested for you", "People you may know", and the left & right sidebars. Strips UTM/tracking params and unwraps l.php redirect links. Greasemonkey / Tampermonkey / Violentmonkey.
-// @author       you
+// @version      3.0.0
 // @match        https://www.facebook.com/*
 // @match        https://web.facebook.com/*
+// @match        https://m.facebook.com/*
 // @run-at       document-start
 // @grant        none
 // @noframes
-// @downloadURL https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-clean-feed.user.js
-// @updateURL   https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-clean-feed.user.js
 // ==/UserScript==
 
 (function () {
   'use strict';
 
   const CONFIG = {
-    hideRightSidebar:     true,
-    hideLeftSidebar:      true,
     hideSponsored:        true,
     hideSuggested:        true,
     hidePeopleYouMayKnow: true,
     hideReelsTrays:       true,
-    skipReelsAds:         true,
-    hideComposer:         true,
-    hideTopBar:           true,
-    forceMostRecent:      true,
-    feedZoom:             1,
+    stripTracking:        true,
     showToggleButton:     true,
     toggleHotkey:         { ctrl: false, alt: true, shift: true, key: 'f' },
-    stripTracking:        true,
-
     extraJunkPhrases:     [],
+
+    hideRightSidebar:     true,
+    hideLeftSidebar:      true,
+    hideComposer:         true,
+    hideTopBar:           true,
+    skipReelsAds:         true,
+    forceMostRecent:      true,
   };
 
-  if (CONFIG.forceMostRecent) {
+  const IS_MOBILE = location.hostname === 'm.facebook.com';
+
+  if (!IS_MOBILE && CONFIG.forceMostRecent) {
     const onHome = location.pathname === '/' || location.pathname === '/home.php';
     if (onHome && !/[?&]sk=/.test(location.search)) {
-      location.replace('https://www.facebook.com/?sk=h_chr');
+      location.replace(location.origin + '/?sk=h_chr');
       return;
     }
   }
@@ -54,21 +52,22 @@
   const EXACT_MARKS = CONFIG.hideReelsTrays ? ['reels', 'reelsandshortvideos', 'stories'] : [];
 
   function injectStyle() {
-    const P = 'html.fcf-strip:not(.fcf-off) ';
-    const R = [P + '[data-fcf-hide]{display:none!important}'];
-    if (CONFIG.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
-    if (CONFIG.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
-    if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');
-    if (CONFIG.hideComposer)     R.push(P + '[role="region"][aria-label="Create a post"]{display:none!important}');
-    if (CONFIG.hideTopBar)       R.push(P + '[role="banner"],' + P + '[role="navigation"][aria-label="Facebook"],' + P + '[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}');
-    if (CONFIG.hideReelsTrays)   R.push(P + '[aria-label="Stories"],' + P + '[aria-label="Reels"]{display:none!important}');
-    R.push(P + '[role="main"]{margin-left:auto!important;margin-right:auto!important}');
-    if (CONFIG.hideTopBar)       R.push(P + 'body{padding-top:0!important}');
-    if (CONFIG.feedZoom && CONFIG.feedZoom !== 1) {
-      R.push(P + '[data-fcf-feed]{zoom:' + CONFIG.feedZoom + '}');
-      R.push('html.fcf-strip:not(.fcf-off){overflow-x:hidden}');
+    const R = [];
+    if (IS_MOBILE) {
+      R.push('html:not(.fcf-off) [data-fcf-hide]{display:none!important}');
+    } else {
+      const P = 'html.fcf-strip:not(.fcf-off) ';
+      R.push(P + '[data-fcf-hide]{display:none!important}');
+      if (CONFIG.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
+      if (CONFIG.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
+      if (CONFIG.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');
+      if (CONFIG.hideComposer)     R.push(P + '[role="region"][aria-label="Create a post"]{display:none!important}');
+      if (CONFIG.hideTopBar)       R.push(P + '[role="banner"],' + P + '[role="navigation"][aria-label="Facebook"],' + P + '[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}');
+      if (CONFIG.hideReelsTrays)   R.push(P + '[aria-label="Stories"],' + P + '[aria-label="Reels"]{display:none!important}');
+      R.push(P + '[role="main"]{margin-left:auto!important;margin-right:auto!important}');
+      if (CONFIG.hideTopBar)       R.push(P + 'body{padding-top:0!important}');
     }
-    R.push('#fcf-toggle{position:fixed;z-index:2147483647;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;font-size:18px;line-height:40px;padding:0;background:#fff;color:#111;box-shadow:0 2px 10px rgba(0,0,0,.35)}');
+    if (CONFIG.showToggleButton) R.push('#fcf-toggle{position:fixed;z-index:2147483647;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;font-size:18px;line-height:40px;padding:0;background:#fff;color:#111;box-shadow:0 2px 10px rgba(0,0,0,.35);touch-action:none;transition:transform .1s}');
     const style = document.createElement('style');
     style.id = 'fcf-style';
     style.textContent = R.join('\n');
@@ -140,7 +139,6 @@
   function processStories() {
     const feed = feedContainer();
     if (!feed) return;
-    feed.setAttribute('data-fcf-feed', '');
     const vh = window.innerHeight;
     for (const story of feed.children) {
       if (story.__fcf === 'hidden') continue;
@@ -183,19 +181,85 @@
     }
   }
 
+  const MOBILE_POST = '[data-tracking-duration-id]';
+  const MOBILE_LABELS = 'span, a[role="link"], h3, h4, div[role="heading"]';
+  function mobilePostIsJunk(post) {
+    for (const el of post.querySelectorAll(MOBILE_LABELS)) {
+      const raw = (el.textContent || '').trim();
+      if (!raw || raw.length > 40) continue;
+      const t = norm(raw);
+      if (!t) continue;
+      if (INCLUDE_MARKS.some((m) => t === m || t.startsWith(m))) return true;
+      if (EXACT_MARKS.includes(t)) return true;
+    }
+    return false;
+  }
+  function sweepMobile() {
+    for (const post of document.querySelectorAll(MOBILE_POST)) {
+      if (post.__fcf) continue;
+      if (mobilePostIsJunk(post)) {
+        post.setAttribute('data-fcf-hide', '');
+        post.__fcf = 'hidden';
+      } else if ((post.__fcfSeen = (post.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
+        post.__fcf = 'clean';
+      }
+    }
+  }
+
+  function toggleClean() {
+    const off = document.documentElement.classList.toggle('fcf-off');
+    const b = document.getElementById('fcf-toggle');
+    if (b) b.style.opacity = off ? '0.4' : '1';
+  }
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function makeDraggable(btn, storeKey, onTap) {
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem(storeKey) || 'null'); } catch (e) {}
+    if (pos && typeof pos.left === 'number') {
+      btn.style.left = clamp(pos.left, 0, window.innerWidth - 40) + 'px';
+      btn.style.top = clamp(pos.top, 0, window.innerHeight - 40) + 'px';
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+    }
+    let press = null;
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      btn.style.transform = 'scale(0.9)';
+      press = { sx: e.clientX, sy: e.clientY, moved: false };
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!press) return;
+      if (!press.moved && Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 6) press.moved = true;
+      if (press.moved) {
+        btn.style.left = clamp(e.clientX - 20, 0, window.innerWidth - 40) + 'px';
+        btn.style.top = clamp(e.clientY - 20, 0, window.innerHeight - 40) + 'px';
+        btn.style.right = 'auto';
+        btn.style.bottom = 'auto';
+      }
+    });
+    btn.addEventListener('pointerup', (e) => {
+      btn.style.transform = '';
+      if (!press) return;
+      const p = press; press = null;
+      try { btn.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (p.moved) {
+        try { localStorage.setItem(storeKey, JSON.stringify({ left: parseInt(btn.style.left, 10), top: parseInt(btn.style.top, 10) })); } catch (e2) {}
+        return;
+      }
+      onTap();
+    });
+  }
+
   function addToggle() {
     if (!CONFIG.showToggleButton || !document.body || document.getElementById('fcf-toggle')) return;
     const b = document.createElement('button');
     b.id = 'fcf-toggle';
     b.textContent = '🧹';
-    b.title = 'Toggle Facebook Clean Feed';
-    b.addEventListener('click', toggleClean);
+    b.title = 'Facebook Clean Feed - tap: toggle · drag: move';
+    makeDraggable(b, 'fcf_pos', toggleClean);
     document.body.appendChild(b);
-  }
-  function toggleClean() {
-    const off = document.documentElement.classList.toggle('fcf-off');
-    const b = document.getElementById('fcf-toggle');
-    if (b) b.style.opacity = off ? '0.4' : '1';
   }
 
   let _handledReel = null, _lastSkip = 0;
@@ -246,7 +310,12 @@
     let dirty = false;
     if (FB_SHIMS.has(u.hostname) && u.pathname === '/l.php') {
       const real = u.searchParams.get('u');
-      if (real) { try { u = new URL(real); dirty = true; } catch (e) {} }
+      if (real) {
+        try {
+          const r = new URL(real);
+          if (r.protocol === 'https:' || r.protocol === 'http:') { u = r; dirty = true; }
+        } catch (e) {}
+      }
     }
     for (const k of [...u.searchParams.keys()]) {
       if (isTrackingParam(k)) { u.searchParams.delete(k); dirty = true; }
@@ -272,6 +341,7 @@
   function sweep() {
     try {
       if (CONFIG.stripTracking) cleanTracking();
+      if (IS_MOBILE) { sweepMobile(); return; }
       hideLeftRail();
       const strip = isFeedPage();
       document.documentElement.classList.toggle('fcf-strip', strip);
@@ -292,7 +362,7 @@
     addToggle();
     new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
     window.addEventListener('scroll', schedule, { passive: true });
-    setInterval(sweep, 1500);
+    setInterval(sweep, IS_MOBILE ? 1000 : 1500);
   }
 
   window.addEventListener('keydown', (e) => {
@@ -306,7 +376,7 @@
   }, true);
 
   injectStyle();
-  document.documentElement.classList.toggle('fcf-strip', isFeedPage());
+  if (!IS_MOBILE) document.documentElement.classList.toggle('fcf-strip', isFeedPage());
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start);
 
