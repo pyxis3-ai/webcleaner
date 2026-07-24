@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         Facebook Clean Feed
 // @namespace    https://local/fb-clean-feed
-// @version      3.3.0
+// @version      3.3.1
+// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-clean-feed.user.js
+// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-clean-feed.user.js
 // @match        https://www.facebook.com/*
 // @match        https://web.facebook.com/*
 // @match        https://m.facebook.com/*

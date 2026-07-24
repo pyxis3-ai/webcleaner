@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         YouTube Skip Ads
 // @namespace    https://local/yt-skip-ads
-// @version      1.6.0
+// @version      1.6.1
+// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
+// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*
 // @match        https://music.youtube.com/*

@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         View Mode Switcher
 // @namespace    https://local/view-mode-switcher
-// @version      2.2.1
+// @version      2.2.2
+// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
+// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue

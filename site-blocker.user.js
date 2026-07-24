@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         Site Blocker
 // @namespace    https://local/site-blocker
-// @version      1.4.0
+// @version      1.4.1
+// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/site-blocker.user.js
+// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/site-blocker.user.js
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
