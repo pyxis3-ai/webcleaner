@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Clean Feed
 // @namespace    https://local/fb-clean-feed
-// @version      3.2.0
+// @version      3.3.0
 // @match        https://www.facebook.com/*
 // @match        https://web.facebook.com/*
 // @match        https://m.facebook.com/*
@@ -259,7 +259,15 @@
     document.body.appendChild(b);
   }
 
-  let _handledReel = null, _lastSkip = 0;
+  // Ad tracking is keyed on the centered <video> element (node identity), NOT the URL
+  // path. Facebook gates its Reels ads and snap-scrolls back to them, and the path does
+  // not reliably change per reel — so keying on the path meant one nudge got reverted and
+  // the ad was then marked "handled" forever. Keying on the element lets us keep retrying a
+  // snapped-back ad and reset cleanly only once we actually land on a different reel.
+  const _reelState = new WeakMap();
+  let _skipTarget = null, _lastSkip = 0, _skipTries = 0;
+  const SKIP_RETRY_MS = 600;
+  const SKIP_MAX_TRIES = 8;
   function handleReels() {
     if (!CONFIG.skipReelsAds || !/^\/reels?(\/|$)/.test(location.pathname)) return;
     const cy = window.innerHeight / 2;
@@ -276,26 +284,37 @@
       reel = reel.parentElement;
       if (reel.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]')) break;
     }
-    if (!reelIsSponsored(reel)) return;
-    const id = location.pathname;
-    if (_handledReel === id || Date.now() - _lastSkip < 400) return;
-    _handledReel = id; _lastSkip = Date.now();
-    const next = document.querySelector('[role="button"][aria-label="Next Card"]');
-    if (next) next.click();
-    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    if (!reelIsSponsored(reel, active)) {
+      if (active !== _skipTarget) { _skipTarget = null; _skipTries = 0; }  // landed on a clean reel
+      return;
+    }
+    if (active !== _skipTarget) { _skipTarget = active; _skipTries = 0; }  // a (new) ad is centered
+    if (Date.now() - _lastSkip < SKIP_RETRY_MS || _skipTries >= SKIP_MAX_TRIES) return;
+    _skipTries++; _lastSkip = Date.now();
+    advancePastReel(reel);
   }
 
-  let _reelSponId = null, _reelSpon = false, _reelTries = 0;
-  function reelIsSponsored(reel) {
-    const id = location.pathname;
-    if (_reelSponId !== id) { _reelSponId = id; _reelSpon = false; _reelTries = 0; }
-    if (_reelSpon) return true;
-    if (_reelTries >= 8) return false;
-    _reelTries++;
+  function advancePastReel(reel) {
+    const next = document.querySelector('[role="button"][aria-label="Next Card"]');
+    if (next) { next.click(); return; }
+    const target = reel.closest('[tabindex]') || reel;  // FB's key handler lives on the reel, not document
+    for (const type of ['keydown', 'keyup']) {
+      target.dispatchEvent(new KeyboardEvent(type, {
+        key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true,
+      }));
+    }
+  }
+
+  function reelIsSponsored(reel, key) {
+    let st = _reelState.get(key);
+    if (!st) _reelState.set(key, (st = { spon: false, tries: 0 }));
+    if (st.spon) return true;
+    if (st.tries >= 8) return false;
+    st.tries++;
     const r = reel.getBoundingClientRect();
     const c = norm(renderedText(reel, r.top - 2, r.bottom + 2));
-    if (SPONSORED_MARKS.some((m) => c.includes(m))) _reelSpon = true;
-    return _reelSpon;
+    if (SPONSORED_MARKS.some((m) => c.includes(m))) st.spon = true;
+    return st.spon;
   }
 
   const TRACK_EXACT = new Set(['fbclid', 'gclid', 'dclid', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'twclid', 'igshid', 'mc_eid', 'mc_cid', '_openstat', 'vero_id', 'oly_enc_id', 'oly_anon_id', 'wickedid', '_hsenc', '_hsmi', 'mkt_tok', 'ref', 'refsrc', 'refid', 'fref', 'hc_ref', 'hc_location', 'ref_src', 'ref_url', 'eav', 'paipv', 'comment_tracking', 'av', 'rdid']);
