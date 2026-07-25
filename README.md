@@ -1,6 +1,6 @@
 # userscripts
 
-A small collection of browser userscripts for a cleaner, ad-free, more focused web - built and tuned against the live 2026 Facebook / YouTube DOM.
+A browser userscript (plus a companion Mobile Mode extension) for a cleaner, ad-free, more focused web - built and tuned against the live 2026 Facebook / YouTube DOM.
 
 ## Install
 
@@ -10,30 +10,28 @@ A small collection of browser userscripts for a cleaner, ad-free, more focused w
 
 | Script | What it does | Install |
 |---|---|---|
-| **Facebook Clean Feed** | One script for desktop **and** `m.facebook.com`: strips Facebook to just your real newsfeed - hides ads/Sponsored (beats the character-scramble obfuscation; detects the "Sponsored" label in 20+ languages incl. Arabic, CJK and Cyrillic), Stories, Reels trays, Suggested, People-you-may-know, both sidebars, the composer and the top bar; auto-skips Sponsored reels; strips UTM/tracking + unwraps `l.php` redirects; forces the chronological "Most Recent" feed. Junk-hiding also covers the **Groups** and **Watch** feeds and individual group pages. | [Install](https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/facebook-clean-feed.user.js) |
-| **YouTube Skip Ads** | Desktop, `m.youtube.com` **and YouTube Music**: auto-skips video ads (clicks Skip, seeks past unskippable, mutes), skips Sponsored Shorts, hides feed/banner/overlay ads, dismisses the "ad blockers not allowed" popup. | [Install](https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/youtube-skip-ads.user.js) |
-| **Site Blocker** | Block adult sites (always) and a "Focus Pack" of distractions (social, video, news, shopping) on a work-hours schedule. Add/remove sites and snooze from the menu. | [Install](https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/site-blocker.user.js) |
-| **View Mode Switcher** | Force a site into Desktop or Mobile rendering by overriding the client-side device signals (user-agent, touch, `matchMedia`) and the viewport. On a phone, "Desktop" gives the real desktop layout. On a desktop browser, "Mobile" switches JS-driven responsive sites - sites decided server-side from the request User-Agent (Facebook, YouTube) need the Mobile Mode extension below. Remembers per site. | [Install](https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/view-mode-switcher.user.js) |
+| **Web Cleaner** | One userscript, four modules: **Facebook Clean Feed** (strips ads/Sponsored, Stories, Reels trays, Suggested, People-you-may-know, both sidebars, composer and top bar; auto-skips Sponsored reels; strips UTM/tracking + unwraps `l.php`; forces the chronological "Most Recent" feed - desktop **and** `m.facebook.com`), **YouTube Skip Ads** (auto-skips video ads, skips Sponsored Shorts, hides feed/banner/overlay ads, dismisses the anti-adblock popup - desktop, `m.youtube.com` and YouTube Music), **Site Blocker** (adult filter always + a work-hours "Focus Pack" of distractions, custom block/allow lists, snooze), and **View Mode Switcher** (force Desktop or Mobile rendering per site). Everything is configurable from one in-page panel - open **⚙ Web Cleaner settings…** from your userscript-manager menu. | [Install](https://raw.githubusercontent.com/pyxis3-ai/userscripts/main/web-cleaner.user.js) |
 
-> Upgrading: **Facebook Mobile - Clean Feed** is gone - it was merged into **Facebook Clean Feed** v3, which now matches `m.facebook.com` too. Remove the old mobile script if you had it installed.
+## One script, four modules
 
-## Why these are separate scripts
+Web Cleaner is a single userscript. Each module (Facebook, YouTube, Site Blocker, View Mode) runs inside its own error boundary, so one site's redesign breaking a module can't take down the others. Shared plumbing - the draggable button, storage, hotkey handling, and the settings panel - is written once.
 
-- One script per concern: different sites, different DOMs, different mechanics. Separate scripts mean you install only what you use, and one site's redesign can't break the rest.
-- **Facebook desktop + mobile** *were* two scripts (completely different DOMs); everything around the DOM work was duplicated, so they are now one script with a per-host branch.
-- **Site Blocker** and **View Mode Switcher** both match every site but share nothing: one blocks pages, the other changes how pages render.
-- **Mobile Mode** is a browser extension, not a userscript, because only an extension can change the request's User-Agent header and the real viewport - the two levers "mobile on desktop" actually needs.
+**Mobile Mode** is still a separate browser **extension**, not part of this: only an extension can change the request's User-Agent header and the real viewport - the two levers "mobile on desktop" actually needs.
+
+### Migrating from the old four scripts
+
+Install **Web Cleaner**, then remove the old **Facebook Clean Feed**, **YouTube Skip Ads**, **Site Blocker**, and **View Mode Switcher** scripts from your manager. Per-site view modes, snoozes, and button positions carry over; Site Blocker's custom block/allow lists and other saved settings reset to defaults, so re-add any custom sites once from the panel.
 
 ## Controls - the same layers everywhere
 
 | Layer | Where |
 |---|---|
-| `CONFIG` block at the top | every script - flip features, edit lists, change shortcuts/schedule |
-| Toggle hotkey | every script (table below) |
+| **⚙ Web Cleaner settings…** panel (from the manager menu) | every feature toggle, site list, schedule, hotkey, and tuning value - persisted to your manager's storage, no file editing |
+| Toggle hotkey | each module (table below); rebindable in the panel |
 | Draggable on-page button (remembers its spot) | Facebook 🧹 · YouTube ⏭ · View Switcher 🖥/📱 · Mobile Mode 📱 |
-| Userscript-manager menu | Site Blocker and View Mode Switcher (the two that keep settings) |
+| Userscript-manager menu | ⚙ settings panel + quick actions: toggle Facebook / YouTube / blocking, block or allow this site, switch View mode |
 
-Site Blocker deliberately has no floating button - it matches every page on the web, so its controls live in the manager menu, the hotkey, and the block screen itself.
+Site Blocker deliberately has no floating button - it matches every page on the web, so its controls live in the manager menu, the hotkey, the settings panel, and the block screen itself.
 
 | Shortcut | Action |
 |---|---|
@@ -42,15 +40,15 @@ Site Blocker deliberately has no floating button - it matches every page on the 
 | `Alt+Shift+B` | Site Blocker - toggle all blocking (works on the block screen too) |
 | `Alt+Shift+V` | View Mode - switch Desktop ⇄ Mobile |
 
-Shortcuts ignore typing in text fields and never use Cmd/Ctrl. Each is editable in the script's `CONFIG`.
+Shortcuts ignore typing in text fields and never use Cmd/Ctrl. Each is rebindable in the settings panel (each module's **Advanced** section).
 
 ## Notes
 
-- **Editing `CONFIG` vs auto-updates:** if you edit an installed script, Tampermonkey pauses auto-updates for it and Violentmonkey overwrites your edits on the next update. For permanent custom config, keep your own copy of the raw file.
+- **Settings & auto-updates:** every setting lives in the panel and is saved to your userscript manager's storage - you never edit the script file, so auto-updates keep working and your settings persist across updates.
 - **Site Blocker** needs Tampermonkey or Violentmonkey (GM storage + menu). The "Allow for 5 minutes" snooze applies to every filter, adult included. For comprehensive adult blocking across all browsers and apps, pair it with a DNS family filter (Cloudflare `1.1.1.3` or NextDNS) - a userscript can't enumerate the whole category.
 - **YouTube:** ads are skipped/hidden after they're requested. For network-level blocking pair it with uBlock Origin. YouTube is rolling out server-side ad stitching (ads baked into the video stream itself); no client-side blocker or script can remove those - the script still auto-skips and mutes everything skippable.
-- **Facebook mobile branch:** built from the documented `m.facebook.com` DOM, not device-tested - add markers to `extraJunkPhrases` in `CONFIG` if something slips through.
-- **View Switcher reach:** on a phone, "Desktop" works via the viewport meta - the right lever there. On a desktop browser, "Mobile" spoofs only what page JavaScript reads (UA / touch / `matchMedia`): client-side responsive sites switch, but no userscript can change the request's User-Agent header or the real window width, so server-decided sites (Facebook, YouTube) and pure CSS `@media` sites won't - that's the extension's job. On Firefox, sandboxed managers can keep the JS spoof from reaching page scripts (the viewport lever still works). A centered phone-width frame is available via `frameOnDesktop` in `CONFIG`.
+- **Facebook mobile branch:** built from the documented `m.facebook.com` DOM, not device-tested - add markers under **Extra junk phrases** in the panel's Facebook section if something slips through.
+- **View Switcher reach:** on a phone, "Desktop" works via the viewport meta - the right lever there. On a desktop browser, "Mobile" spoofs only what page JavaScript reads (UA / touch / `matchMedia`): client-side responsive sites switch, but no userscript can change the request's User-Agent header or the real window width, so server-decided sites (Facebook, YouTube) and pure CSS `@media` sites won't - that's the extension's job. Because the spoof is injected into the page context, it now works even under Firefox's sandboxed managers. A centered phone-width frame is available via **Phone frame on desktop** in the panel.
 
 ## Mobile Mode (companion extension) - mobile sites on desktop
 
