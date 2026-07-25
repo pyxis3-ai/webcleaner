@@ -1,17 +1,17 @@
-# Design: Web Cleaner — one unified userscript
+# Design: Web Cleaner — one unified userscript with a full control panel
 
 **Date:** 2026-07-25
 **Status:** Approved (brainstorming) — pending user spec review
 
 ## Goal
 
-Replace the repo's four separate userscripts with a **single installable userscript**, `web-cleaner.user.js`. The user dislikes having separate files for three reasons, all of which this addresses:
+Replace the repo's four separate userscripts with a **single installable userscript**, `web-cleaner.user.js`, and give it **one unified in-page control panel** (opened from the userscript-manager menu) that exposes *every* interactive feature, capability, and tuning value across all four modules. The user dislikes separate files (too many installs, repo clutter/duplication, conceptually messy) and wants everything interactive reachable from the menu rather than by editing `CONFIG`.
 
-1. **Too many installs** — one script to install instead of four.
-2. **Repo clutter / duplication** — the plumbing duplicated across scripts (draggable button, GM-storage wrapper, hotkey handler, button CSS) is written once.
-3. **Conceptually messy** — one unified thing.
+This merges two related asks:
+1. **Consolidation** — four scripts → one file, shared plumbing written once.
+2. **Menu-driven control** — a single "⚙ Web Cleaner settings…" panel where every setting (feature toggles, mode selectors, site lists, schedule times, hotkeys, widths, UA strings) is editable and persisted. `CONFIG` becomes the *default schema*; runtime settings live in GM storage.
 
-This is a **behavior-preserving consolidation**, not a rewrite. Every feature keeps its current behavior, hotkey, button, menu, and settings semantics. There is exactly one intentional behavioral change (View Mode's signal spoofing mechanism — see below), and it is a strict improvement.
+It is otherwise **behavior-preserving**: each feature keeps its current detection/DOM logic verbatim. There are three intentional behavioral changes, all improvements or consequences of the above (View Mode signal-spoof mechanism; FB/YT master-enable now persists; feature flags are now runtime-editable).
 
 ## Scope
 
@@ -19,20 +19,24 @@ This is a **behavior-preserving consolidation**, not a rewrite. Every feature ke
 - Facebook Clean Feed (`facebook-clean-feed.user.js`, v3.3.1)
 - YouTube Skip Ads (`youtube-skip-ads.user.js`, v1.6.1)
 - Site Blocker (`site-blocker.user.js`, v1.4.1)
-- View Mode Switcher (`view-mode-switcher.user.js`, v2.2.2 — currently deleted from the working tree, restored from git into the merge)
+- View Mode Switcher (`view-mode-switcher.user.js`, v2.2.2 — restored from git into the merge)
 
 **Out of scope (hard boundaries):**
-- `mobile-mode/` browser extension — it changes the request User-Agent header and the real viewport, which a userscript fundamentally cannot do. Stays a separate extension, untouched.
+- `mobile-mode/` browser extension — changes the request User-Agent header + real viewport, which a userscript cannot do. Untouched.
+- No build system, bundler, or module files. No new *detection/DOM* logic — the panel controls existing behavior, it does not add new site-cleaning features.
 
 ## Key decisions (from brainstorming)
 
 | Decision | Choice |
 |---|---|
-| Build approach | **Single hand-authored file, no build step** (Approach A). No Node tooling, no bundler, no committed build artifact. |
+| Build approach | **Single hand-authored file, no build step.** No tooling, no bundler, no committed artifact. |
 | Scope | **All four** userscripts. |
 | Filename / `@name` | `web-cleaner.user.js` / **"Web Cleaner"** |
 | Old files | **Delete all four**, replace with the one. |
-| Tests | `node --check` + manual verification checklist. No unit-test framework (repo has none; pure helpers move over verbatim). |
+| Menu shape | **Unified in-page control panel** (generalize Site Blocker's shadow-DOM panel), opened from a menu command, plus a few quick-action menu commands. |
+| Panel depth | **Everything, including tuning** — all toggles, selectors, list editors, schedule times, hotkey bindings, widths, DPR, UA strings. |
+| Persistence | `CONFIG` = defaults; live settings in **GM storage**, one object per module. Edits persist immediately; reload only when the edit affects the current page. |
+| Tests | `node --check` + manual checklist. No unit-test framework. |
 
 ## Architecture
 
@@ -54,7 +58,7 @@ This is a **behavior-preserving consolidation**, not a rewrite. Every feature ke
 // ==/UserScript==
 ```
 
-Rationale for `@grant GM_*` over `@grant none`: Site Blocker and View Mode need GM storage + menu, which forces the whole file into the userscript-manager **sandbox**. Facebook and YouTube currently use `@grant none` (page context) but do only pure DOM work (`querySelector`, clicks, `<style>` injection, `history.replaceState`, `MutationObserver`), all of which behave identically in the sandbox. Moving them into the sandbox is safe and, as a bonus, avoids page-CSP issues that `@grant none` injection can hit.
+Site Blocker and View Mode need GM storage + menu, forcing the whole file into the manager **sandbox**. Facebook and YouTube (`@grant none` today) do only pure DOM work (`querySelector`, clicks, `<style>` injection, `history.replaceState`, `MutationObserver`), all identical in the sandbox — they move in safely (and avoid page-CSP issues that `@grant none` injection can hit).
 
 ### File layout (one IIFE)
 
@@ -62,140 +66,171 @@ Rationale for `@grant GM_*` over `@grant none`: Site Blocker and View Mode need 
 (function () {
   'use strict';
 
-  // ---- 1. CONFIG (namespaced per feature) ----
-  const CONFIG = {
-    facebook:    { …current FB CONFIG… },
-    youtube:     { …current YT CONFIG… },
-    siteBlocker: { …current Site Blocker CONFIG… },
-    viewMode:    { …current View Mode CONFIG… },
-  };
+  // ---- 1. DEFAULTS (the CONFIG schema, namespaced per feature) ----
+  const DEFAULTS = { facebook:{…}, youtube:{…}, siteBlocker:{…}, viewMode:{…} };
 
-  // ---- 2. Shared helpers (written ONCE) ----
+  // ---- 2. Settings layer ----
   const GM_OK, gGet, gSet;
+  // settings.<module> = { ...DEFAULTS.<module>, ...gGet('wc_<module>', {}) }   // GM overrides defaults
+  const settings = loadSettings();
+  function saveModule(name);                 // gSet('wc_'+name, settings[name])
+  function applyEdit(name, mutate);          // mutate(); saveModule(name); reload IF it affects THIS page, else refresh panel
+
+  // ---- 3. Shared helpers (written ONCE) ----
   const clamp;
-  function makeDraggable(btn, storeKey, onTap, opts);   // opts.longPress → View Mode long-press-for-Auto; opts.store → pluggable pos backend (default localStorage; View Mode passes GM)
-  function onHotkey(spec, handler);                     // keydown listener + text-field guard, factored out
+  function makeDraggable(btn, storeKey, onTap, opts);   // opts.longPress → View Mode long-press-for-Auto; positions in localStorage
+  function onHotkey(getSpec, handler);                  // keydown listener + text-field guard; reads the CURRENT binding each event
   const BUTTON_CSS;                                     // shared 40px floating-button base style
   function injectPageScript(fn, payload);               // runs fn(payload) synchronously in PAGE context at document-start
+  const Panel = { open, close, render, … };             // the shared control-panel component (§ Control panel)
 
-  // ---- 3. Feature modules (each a self-contained guarded function; logic copied verbatim) ----
+  // ---- 4. Feature modules (each a guarded function; detection/DOM logic verbatim, reading settings.<module>) ----
   function initSiteBlocker() { … }
   function initViewMode()    { … }
   function initFacebook()    { … }
   function initYouTube()     { … }
 
-  // ---- 4. Bootstrap ----
+  // ---- 5. Menu commands ----
+  function registerMenu();   // defines "⚙ Web Cleaner settings…" + quick actions (§ Menu); called in bootstrap
+
+  // ---- 6. Bootstrap ----
   const host = location.hostname;
-  const FB_HOSTS = new Set(['www.facebook.com', 'web.facebook.com', 'm.facebook.com']);
-  const YT_HOSTS = new Set(['www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
-  const run = (name, fn) => { try { fn(); } catch (e) { console.warn('[' + name + ']', e); } };
+  const FB_HOSTS = new Set(['www.facebook.com','web.facebook.com','m.facebook.com']);
+  const YT_HOSTS = new Set(['www.youtube.com','m.youtube.com','music.youtube.com']);
+  const run = (name, fn) => { try { fn(); } catch (e) { console.warn('['+name+']', e); } };
 
   run('SiteBlocker', initSiteBlocker);   // first: may replace the page with the block screen
   run('ViewMode', initViewMode);
   if (FB_HOSTS.has(host)) run('FCF', initFacebook);
   if (YT_HOSTS.has(host)) run('YT',  initYouTube);
+  registerMenu();
 })();
 ```
 
-### Bootstrap order
+**Isolation:** every module runs through `run(name, fn)` (try/catch), so one site's DOM redesign crashing a module can't abort the others — the explicit replacement for the "separate files can't break each other" property. Existing internal try/catch (FB `sweep`, YT `tick`) preserved.
 
-Site Blocker runs **first** because `showBlock()` replaces `document.documentElement.innerHTML` with the block screen. On a blocked page the other modules then find no feed/player and no-op. On a normal page, order is irrelevant. This matches today's (nondeterministic, separate-script) behavior but makes it deterministic.
+**Bootstrap order:** Site Blocker first (its `showBlock()` replaces `document.documentElement.innerHTML`); other modules then no-op on a blocked page.
 
-### Isolation / robustness
+## Settings layer & persistence
 
-Each module is invoked through `run(name, fn)` which wraps it in `try/catch`. A crash in one module (e.g. a Facebook DOM redesign throwing) cannot abort the others. This is the explicit replacement for the "separate files can't break each other" property being given up by merging. Inside each module, existing internal `try/catch` blocks (FB's `sweep`, YT's `tick`) are preserved.
+`DEFAULTS` (the former `CONFIG`) is the schema and fallback. At load, each module's live settings are `{ ...DEFAULTS.<module>, ...gGet('wc_<module>', {}) }`. Modules read from `settings.<module>.*`. Because edits persist then reload when they affect the current page, derived structures (FB's `INCLUDE_MARKS`/`EXACT_MARKS`, injected CSS strings) are simply recomputed from `settings` at init on the next load — no fragile live re-wiring.
 
-## Shared helpers — what collapses
+**GM storage (global, per-script; resets to defaults on the new install):** one object per module.
 
-Verified byte-for-byte or near-identical duplication across the current files:
+- `wc_facebook` = `{ enabled, hideSponsored, hideSuggested, hidePeopleYouMayKnow, hideReelsTrays, stripTracking, hideRightSidebar, hideLeftSidebar, hideComposer, hideTopBar, skipReelsAds, forceMostRecent, showToggleButton, extraJunkPhrases[], toggleHotkey{} }`
+- `wc_youtube` = `{ enabled, skipVideoAds, skipShortsAds, hideFeedAds, hideBanners, muteAds, dismissAntiAdblock, showToggleButton, toggleHotkey{} }`
+- `wc_siteBlocker` = `{ enabled, blockAdult, blockFocus, scheduleOn, snoozeMinutes, schedule{days,from,to}, custom[], allow[], toggleHotkey{} }`
+- `wc_viewMode` = `{ newSiteDefault, showButton, spoofUA, spoofTouch, spoofMedia, frameOnDesktop, longPressMs, desktopWidth, mobileWidth, mobileHeight, mobileDpr, mobileUA, desktopUA, toggleHotkey{} }`
 
-- **`makeDraggable(btn, storeKey, onTap)`** — identical in FB and YT. View Mode has a superset variant that also supports long-press (→ set mode to Auto) and stores its position in **GM** storage rather than localStorage. Unify into one `makeDraggable(btn, storeKey, onTap, opts)` where `opts` is optional: `opts.longPress = { ms, onLongPress }` (View Mode only) and `opts.store = { get, set }` (defaults to a localStorage-backed accessor; View Mode passes a GM-backed one). FB/YT pass no opts. This keeps each module's position-storage location exactly as today, so behavior stays identical.
-- **`GM_OK` / `gGet` / `gSet`** — identical in Site Blocker and View Mode. One copy.
-- **Hotkey handler** — the `keydown` listener (meta/ctrl/alt/shift match + `isContentEditable`/input/textarea/select guard) is structurally identical in all four. Factor into `onHotkey(spec, handler)`; each module calls it with its own `CONFIG.<feature>.toggleHotkey` and toggle function.
-- **`clamp`** — identical everywhere. One copy.
-- **Floating-button base CSS** — the `position:fixed;z-index:2147483647;width:40px;height:40px;border-radius:50%;…` block is shared by FB and YT (View Mode sets it inline via `Object.assign`). One shared `BUTTON_CSS` string; View Mode keeps its own color/opacity overrides.
+**localStorage (per-origin; survives the switch):** ephemeral / per-site state only — `vm_mode` (per-site view mode), `sb_snooze` (snooze-until), and button positions `fcf_pos` / `yt_pos` / `vm_pos` (all three now localStorage; `makeDraggable` is a single plain implementation).
 
-Everything else is feature-specific and copied verbatim into its `init*()` function.
+**`applyEdit(name, mutate)`** persists a change, then reloads the page only if it changes what the current page shows right now:
+- FB/YT edits → reload iff the current host is that module's host.
+- Site Blocker edits → reuse its existing before/after `blockReason()` check (reload iff this page's blocked-state flips).
+- View Mode edits → reload iff View Mode is active on this site (`mode !== 'auto'`).
+- Hotkey rebinds → **no reload**; `onHotkey` reads the current binding on each event, so it's live.
+- Pure-default fields with no current-page effect (e.g. `newSiteDefault`, `snoozeMinutes`) → persist + refresh panel only.
 
-## The View Mode context split (only intentional behavioral change)
+## Control panel (the shared UI component)
 
-**Problem:** In the sandbox, `window`/`navigator`/`screen` are the manager's wrappers. View Mode's `Object.defineProperty` overrides on them are invisible to the page's own scripts, so the UA/touch/`matchMedia` spoof would silently do nothing (the README already documents this failure under Firefox sandboxed managers).
+Generalize Site Blocker's shadow-DOM panel into a reusable `Panel` that renders a **"Web Cleaner"** dialog with one collapsible `<details>` section per module. Reuses Site Blocker's existing switch component, list editor, `esc`/`cleanHost` helpers, and shadow-DOM isolation (`:host{all:initial}`).
 
-**Solution:** Split View Mode into two parts:
+**Each module section** shows its master enable + common toggles up front, and an **"Advanced"** nested `<details>` holding tuning fields — so the panel is complete without being overwhelming.
 
-- **Sandbox part (unchanged mechanism):** compute `realMobile`, `toMobile`, `useFrame`, `mode` (these read the *true* `navigator`, which is correct — the sandbox sees the real UA). Then run `applyViewport()` (viewport `<meta>`), `applyFrame()` (frame CSS + `vm-framed` class), the button, the hotkey, and the GM menu commands — all pure DOM/GM work that already works in the sandbox.
-- **Page part (new mechanism):** `spoofSignals()` + `installMatchMedia()` are injected into the **page** via a synchronous document-start `<script>` element:
+- **Facebook:** master enable; toggles for hideSponsored / hideSuggested / hidePeopleYouMayKnow / hideReelsTrays / hideRightSidebar / hideLeftSidebar / hideComposer / hideTopBar / stripTracking / skipReelsAds / forceMostRecent / showToggleButton; a list editor for `extraJunkPhrases`. Advanced: hotkey rebind.
+- **YouTube:** master enable; toggles for skipVideoAds / skipShortsAds / hideFeedAds / hideBanners / muteAds / dismissAntiAdblock / showToggleButton. Advanced: hotkey rebind.
+- **Site Blocker:** the existing panel content — blocking/adult/focus/schedule switches, "my blocked sites" + "allowed" list editors, built-in Focus/Adult packs. Advanced: schedule days + from/to time inputs, snooze-minutes number field, hotkey rebind. (Today's panel shows schedule times read-only; they become editable.)
+- **View Mode:** per-site mode selector (Desktop / Mobile / Auto); new-site default selector; toggles for spoofUA / spoofTouch / spoofMedia / frameOnDesktop / showButton. Advanced: desktopWidth / mobileWidth / mobileHeight / mobileDpr number fields, mobileUA / desktopUA text fields, longPressMs, hotkey rebind.
 
-  ```
-  function injectPageScript(fn, payload) {
-    const s = document.createElement('script');
-    s.textContent = '(' + fn.toString() + ')(' + JSON.stringify(payload) + ');';
-    (document.head || document.documentElement).appendChild(s);
-    s.remove();
-  }
-  ```
+**Controls & validation:**
+- **Switches** — the existing `.sw` toggle.
+- **Number/text fields** — `<input>` inside shadow DOM; validate on commit (positive integers for widths/DPR/snooze/longPressMs; non-empty for UA strings); invalid input reverts to the stored value.
+- **Time fields** — `<input type="time">` for schedule from/to (HH:MM).
+- **List editors** — Site Blocker's existing add/remove pattern, reused for blocked sites, allowed sites, and FB extra-junk phrases.
+- **Hotkey rebind** — a "Press keys…" button that captures the next `keydown`, records `{ctrl, alt, shift, key}`, and requires at least one modifier (Alt/Ctrl/Shift; Meta disallowed, matching "never Cmd/Ctrl"). No hard conflict prevention across features; if two are set identically both fire (acceptable).
 
-  The injected function is a self-contained copy of the current `spoofSignals`/`installMatchMedia` logic that references only its `payload` argument (`{ mode, toMobile, useFrame, cfg }`) and the page globals — no closure over the outer IIFE. Appending an inline `<script>` at `document-start` executes it synchronously in page context **before** the page's own scripts run, so the overrides land in time.
+Every control routes through `applyEdit(module, mutate)`.
 
-**Result:** identical behavior on phones (viewport lever), and the desktop JS-spoof now works even under sandboxed managers where it previously failed. Strict improvement.
+**Opening the panel:** the menu command "⚙ Web Cleaner settings…" (on every page); Site Blocker's block screen keeps its "⚙ Manage" button (now opens the full panel). Floating buttons keep tap = toggle their own feature (unchanged).
 
-**Caveat:** a strict site CSP that forbids inline `<script>` could block the injected spoof (the sandbox parts — viewport, frame, button — still work). This is no worse than today, where the sandbox override already failed on such setups.
+## Menu commands
+
+The manager menu lists, for the one script:
+- **⚙ Web Cleaner settings…** → opens the panel.
+- Quick actions (frequent, avoid opening the panel): **toggle Facebook clean feed**, **toggle YouTube skip-ads**, **toggle blocking**, **➕ block this site**, **➖ allow this site**, **View: Desktop / Mobile / Auto (this site)**.
+
+This puts every interactive capability one or two clicks from the menu, with the panel as the exhaustive surface.
+
+## The View Mode context split (behavioral change #1)
+
+In the sandbox, `window`/`navigator`/`screen` are the manager's wrappers, so View Mode's `Object.defineProperty` overrides are invisible to page scripts (the README documents this failing under Firefox sandboxed managers). Fix: compute `realMobile`/`toMobile`/`useFrame`/`mode` in the sandbox (they read the true `navigator`), then inject only `spoofSignals` + `installMatchMedia` into the **page** as a synchronous document-start `<script>`:
+
+```
+function injectPageScript(fn, payload) {
+  const s = document.createElement('script');
+  s.textContent = '(' + fn.toString() + ')(' + JSON.stringify(payload) + ');';
+  (document.head || document.documentElement).appendChild(s);
+  s.remove();
+}
+```
+
+The injected function references only its `payload` (`{ mode, toMobile, useFrame, cfg }`) and page globals — no closure over the IIFE. Appending an inline `<script>` at document-start runs it in page context before the page's own scripts. Viewport meta, frame CSS, button, hotkey, and menu stay in the sandbox. Result: identical on phones; the desktop JS-spoof now works even under sandboxed managers. **Caveat:** a strict inline-script CSP could block the injected spoof (sandbox parts still work) — no worse than today.
+
+## Behavioral changes (all intentional)
+
+1. **View Mode signal spoof** now runs via page injection (above) — strict improvement.
+2. **FB/YT master enable persists.** Today the button/hotkey toggle is per-page only. Now button, hotkey, and panel switch all read/write `settings.<module>.enabled` (GM), so the state sticks across reloads — consistent with Site Blocker/View Mode.
+3. **Feature flags are runtime-editable** via the panel (previously CONFIG-only). Changing one persists and reloads only if it affects the current page.
+
+## What does NOT change
+
+- Hotkey **defaults**: `Alt+Shift+F/Y/B/V` (now rebindable in the panel).
+- Buttons: 🧹 FB, ⏭ YT, 🖥/📱/🔄 View Mode; same IDs, same defaults (FB/YT bottom-right, View Mode bottom-left → no overlap); tap = toggle. Site Blocker still has no floating button.
+- All detection/DOM logic verbatim: FB's per-host branch, sponsored detection, reel-ad skip, tracking strip, force-Most-Recent; YT's video/Shorts skip, feed/banner hiding, anti-adblock dismissal; Site Blocker's block screen + schedule + packs; View Mode's viewport/frame/matchMedia logic.
 
 ## Settings & migration
 
-The merged script is a **new install** (new `@name`/`@namespace`). GM storage is keyed per-script, so:
+The merged script is a **new install** (new `@name`/`@namespace`). GM storage is per-script, so on first run every `wc_<module>` object is absent and falls back to `DEFAULTS` — behavior identical to the old scripts' defaults. **localStorage survives** (per-origin): per-site view mode, snooze, button positions. Consequence: after installing Web Cleaner and removing the old four, re-add any custom blocked/allowed sites and re-apply any non-default settings once. Documented in the README migration note. No migration code (GM storage is isolated per script; not worth building for a personal repo).
 
-- **Survives** (localStorage, per-origin, shared across scripts): per-site view mode (`vm_mode`), Site Blocker snooze (`sb_snooze`), Facebook and YouTube button positions (`fcf_pos`, `yt_pos`).
-- **Resets** (GM storage, per-script): Site Blocker's custom block/allow lists (`sb_custom`, `sb_allow`), its toggle states (`sb_on`, `sb_adult`, `sb_focus`, `sb_sched`), View Mode's new-site default (`vm_global`), and View Mode's button position (`vm_pos`, GM-stored — reverts to its default corner). These fall back to their `CONFIG` defaults on first run of the unified script.
+## Phased implementation (to guide the plan)
 
-Consequence for the user: after installing Web Cleaner and removing the old four, re-add any custom blocked/allowed sites once. Documented in the README migration note. No storage-migration code is written (GM storage is isolated per script; there is no clean cross-script read — not worth building for a personal repo).
-
-Storage keys stay namespaced exactly as today (`fcf_*`, `yt_*`, `sb_*`, `vm_*`) — no collisions across modules.
-
-## What explicitly does NOT change
-
-- Hotkeys: `Alt+Shift+F` (FB), `Alt+Shift+Y` (YT), `Alt+Shift+B` (Site Blocker), `Alt+Shift+V` (View Mode).
-- Buttons: 🧹 FB, ⏭ YT, 🖥/📱/🔄 View Mode; same IDs, same defaults (FB/YT bottom-right, View Mode bottom-left → no overlap). FB/YT positions persist as today; View Mode's saved position resets once (GM-stored) but its default corner is unchanged. Site Blocker still has no floating button.
-- Site Blocker's shadow-DOM management panel, its four menu commands, and its block screen — verbatim.
-- View Mode's four menu commands (per-site desktop/mobile/auto + cycle new-site default) — verbatim.
-- Facebook's per-host desktop/mobile branch, sponsored detection, reel-ad skip, tracking strip, force-Most-Recent — verbatim.
-- YouTube's video/Shorts ad skip, feed/banner hiding, anti-adblock dismissal — verbatim.
-
-## Documentation changes
-
-- **README.md:**
-  - Collapse the install table to a single **Web Cleaner** row (one raw-URL install link).
-  - Replace the "Why these are separate scripts" section with a short "One script, four modules" section (one install, shared plumbing once, per-module `try/catch` isolation; note that `mobile-mode` stays a separate extension by necessity).
-  - Add a migration note: install Web Cleaner, then remove the old four scripts; re-add any custom Site Blocker sites once (GM settings reset).
-  - Keep the controls and hotkey tables (unchanged).
-- **index.html:** collapse the four userscript install cards into one Web Cleaner card (keep the Mobile Mode extension card).
+1. **Merge** the four modules verbatim into one file with shared helpers (`clamp`, `makeDraggable`, `onHotkey`, `BUTTON_CSS`, `injectPageScript`) + guarded bootstrap. Behavior-preserving; still CONFIG-driven. Verify with `node --check` + manual pass.
+2. **View Mode context split** — move `spoofSignals` to page injection.
+3. **Settings layer** — `DEFAULTS` + `settings` load/merge + `saveModule` + `applyEdit`; modules read `settings.<module>`; master enables persist.
+4. **Control panel** — generalize Site Blocker's panel into `Panel`; add all module sections, Advanced tuning, list editors, hotkey capture, validation.
+5. **Menu** — "⚙ Web Cleaner settings…" + quick actions.
+6. **Docs** — README (single install + "one script, four modules" + migration note), `index.html` (one install card).
 
 ## Verification plan
 
-1. **`node --check web-cleaner.user.js`** — parses cleanly (catches merge/syntax slips). Primary automated gate.
+1. **`node --check web-cleaner.user.js`** — parses cleanly. Primary automated gate.
 2. **Manual checklist** (install in Violentmonkey/Tampermonkey):
-   - Facebook: feed cleaned, 🧹 button toggles + drags, `Alt+Shift+F` toggles; check `m.facebook.com` branch.
-   - YouTube: video ad auto-skips, ⏭ button + `Alt+Shift+Y`; feed ads hidden.
-   - Site Blocker: a Focus-Pack/adult/custom site shows the block screen; panel opens (menu + block-screen ⚙), add/remove/allow works live, `Alt+Shift+B` toggles, snooze works.
-   - View Mode: toggle on a responsive site and confirm in the page console that `navigator.userAgent` actually flips (validates the page-injection fix); viewport switches; button long-press → Auto; menu commands.
-   - Cross-module: on facebook.com, both the FB 🧹 and View Mode buttons appear and neither breaks the other; a thrown error in one module (temporarily inject one) does not disable the others.
+   - FB: feed cleaned, 🧹 button + `Alt+Shift+F`; `m.facebook.com` branch.
+   - YT: video ad auto-skips, ⏭ button + `Alt+Shift+Y`; feed ads hidden.
+   - Site Blocker: a Focus/adult/custom site shows block screen; panel add/remove/allow live; snooze; toggle.
+   - View Mode: toggle a responsive site, confirm in the page console `navigator.userAgent` actually flips (validates injection); viewport switches; long-press → Auto.
+   - **Panel:** every section renders; toggling a flag persists + reloads-when-relevant; number/time/UA validation rejects bad input; hotkey capture rebinds and the new binding fires; list editors add/remove; panel opens from menu and from the block screen.
+   - **Persistence:** set a few non-defaults, reload, confirm they stick; master-enable off persists across reload.
+   - **Isolation:** a thrown error injected into one module does not disable the others.
 
-No unit-test framework is added: the repo has none, and the pure helpers (`norm`, `cleanUrl`, `isTrackingParam`, `inSchedule`, `cleanHost`, `matchMedia` `decide`) are copied verbatim, so their internals carry no new regression risk. The merge risk is in the wiring, which `node --check` + the manual checklist cover. Pure-helper unit tests can be added later if desired.
+No unit-test framework: the repo has none, detection logic is copied verbatim, and the code is almost entirely live-DOM. Pure-helper tests can be added later if desired.
 
 ## Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| FB/YT relied on page context (`@grant none`) for something beyond DOM | Audit confirms they do only DOM/`history`/`localStorage`/`MutationObserver` work — all sandbox-safe. Verify in the manual checklist. |
-| View Mode page-injection blocked by strict site CSP | Sandbox parts (viewport/frame/button) still work; no worse than today's failed sandbox override. |
-| One module's crash breaks the page | Per-module `try/catch` in `run()`; matches the isolation of separate files. |
-| GM settings reset confuses the user on first run | Documented migration note; defaults are sensible. |
-| Existing installs 404 on auto-update after old files deleted | Expected and accepted (user chose delete). Manager keeps last version until the user manually installs Web Cleaner and removes the old four. |
+| FB/YT relied on page context (`@grant none`) beyond DOM | Audit confirms DOM/`history`/`localStorage`/`MutationObserver` only — sandbox-safe. Verify manually. |
+| View Mode page-injection blocked by strict CSP | Sandbox parts (viewport/frame/button) still work; no worse than today. |
+| Panel is large — regressions in reused Site Blocker panel logic | Build in Phase 4 on top of a verified merge; reuse the existing panel code as-is for the Site Blocker section, extend for others. |
+| Hotkey capture edge cases (modifier-only, conflicts, typing hijack) | Require ≥1 modifier, disallow Meta, keep the input-field guard; allow (don't police) duplicate bindings. |
+| One module's crash breaks the page | Per-module `try/catch` in `run()`. |
+| GM settings reset on install confuses the user | Documented migration note; defaults are sensible. |
+| Old installs 404 on auto-update after deletion | Expected/accepted; reinstall Web Cleaner once, remove old four. |
 
 ## Out of scope / non-goals
 
-- No build system, bundler, or module files (Approach B was rejected).
-- No storage-migration code for GM settings.
-- No changes to the `mobile-mode/` extension.
-- No new features — behavior-preserving consolidation only.
-- No refactoring of module internals beyond extracting the five shared helpers.
+- No build system, bundler, or module files.
+- No storage-migration code.
+- No changes to `mobile-mode/`.
+- No new detection/DOM cleaning features — the panel controls existing behavior only.
+- No refactoring of module internals beyond the settings-read indirection and the shared helpers.
