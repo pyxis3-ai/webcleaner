@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Web Cleaner
-// @namespace    https://local/web-cleaner
+// @namespace    https://local/webcleaner
 // @version      1.0.0
-// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/web-cleaner.user.js
-// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/web-cleaner.user.js
+// @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
+// @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
 // @run-at       document-start
 // @grant        GM_getValue
