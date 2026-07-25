@@ -232,7 +232,154 @@
       applyEdit('siteBlocker', () => { settings.siteBlocker.enabled = !settings.siteBlocker.enabled; }, 'block');
     });
   }
-  function initViewMode() {}
+  const vmSiteMode = (() => { try { return localStorage.getItem('vm_mode') || ''; } catch (e) { return ''; } })();
+  const vmMode = vmSiteMode || settings.viewMode.newSiteDefault;
+  const viewModeActive = () => vmMode !== 'auto';
+  function setSiteMode(m) { try { localStorage.setItem('vm_mode', m); } catch (e) {} location.reload(); }
+
+  // Runs in PAGE context. Self-contained: references only `p` (payload) and page globals.
+  function vmSpoofInPage(p) {
+    const def = (obj, prop, getter) => {
+      try { Object.defineProperty(obj, prop, { configurable: true, get: getter }); return true; }
+      catch (e) { return false; }
+    };
+    function installMatchMedia(emuWidth, coarse) {
+      const native = window.matchMedia ? window.matchMedia.bind(window) : null;
+      const decide = (qRaw) => {
+        const q = String(qRaw).toLowerCase();
+        let known = null;
+        const clause = (ok) => { if (known !== false) known = ok; };
+        let m;
+        if ((m = q.match(/min-width:\s*(\d+(?:\.\d+)?)px/))) clause(emuWidth >= parseFloat(m[1]));
+        if ((m = q.match(/max-width:\s*(\d+(?:\.\d+)?)px/))) clause(emuWidth <= parseFloat(m[1]));
+        if (q.includes('pointer: coarse') || q.includes('any-pointer: coarse')) clause(coarse);
+        if (q.includes('pointer: fine') || q.includes('any-pointer: fine')) clause(!coarse);
+        if (q.includes('hover: none')) clause(coarse);
+        if (q.includes('hover: hover')) clause(!coarse);
+        return known;
+      };
+      window.matchMedia = function (query) {
+        const verdict = decide(query);
+        if (verdict === null && native) return native(query);
+        return {
+          matches: !!verdict, media: String(query), onchange: null,
+          addEventListener() {}, removeEventListener() {},
+          addListener() {}, removeListener() {}, dispatchEvent() { return false; },
+        };
+      };
+    }
+    const toMobile = p.toMobile, cfg = p.cfg;
+    if (cfg.spoofUA) {
+      const ua = toMobile ? cfg.mobileUA : cfg.desktopUA;
+      def(navigator, 'userAgent', () => ua);
+      def(navigator, 'appVersion', () => ua.replace(/^Mozilla\//, ''));
+      def(navigator, 'platform', () => (toMobile ? 'Linux armv8l' : 'Win32'));
+      def(navigator, 'vendor', () => 'Google Inc.');
+      try {
+        const prevBrands = navigator.userAgentData ? navigator.userAgentData.brands : [];
+        def(navigator, 'userAgentData', () => ({
+          mobile: toMobile,
+          platform: toMobile ? 'Android' : 'Windows',
+          brands: prevBrands,
+          getHighEntropyValues: () => Promise.resolve({ mobile: toMobile, platform: toMobile ? 'Android' : 'Windows' }),
+          toJSON: () => ({ mobile: toMobile, platform: toMobile ? 'Android' : 'Windows', brands: prevBrands }),
+        }));
+      } catch (e) {}
+    }
+    if (cfg.spoofTouch) {
+      def(navigator, 'maxTouchPoints', () => (toMobile ? 5 : 0));
+      try { if (toMobile && !('ontouchstart' in window)) window.ontouchstart = null; } catch (e) {}
+    }
+    if (cfg.spoofMedia) {
+      const emuW = toMobile ? cfg.mobileWidth : cfg.desktopWidth;
+      installMatchMedia(emuW, toMobile);
+      if (p.useFrame) {
+        def(window, 'innerWidth', () => cfg.mobileWidth);
+        def(window, 'innerHeight', () => cfg.mobileHeight);
+        def(screen, 'width', () => cfg.mobileWidth);
+        def(screen, 'height', () => cfg.mobileHeight);
+        def(screen, 'availWidth', () => cfg.mobileWidth);
+        def(screen, 'availHeight', () => cfg.mobileHeight);
+        def(window, 'devicePixelRatio', () => cfg.mobileDpr);
+      }
+    }
+  }
+
+  function initViewMode() {
+    const vm = settings.viewMode;
+    const realUA = navigator.userAgent;
+    const uaData = navigator.userAgentData;
+    const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(realUA) ||
+      /iPad/.test(realUA) ||
+      (/Macintosh/.test(realUA) && navigator.maxTouchPoints > 1) ||
+      (!!uaData && uaData.mobile === true);
+    const toMobile = vmMode === 'mobile';
+    const useFrame = toMobile && !realMobile && vm.frameOnDesktop;
+
+    if (vmMode !== 'auto') {
+      injectPageScript(vmSpoofInPage, {
+        toMobile: toMobile, useFrame: useFrame,
+        cfg: {
+          spoofUA: vm.spoofUA, spoofTouch: vm.spoofTouch, spoofMedia: vm.spoofMedia,
+          mobileUA: vm.mobileUA, desktopUA: vm.desktopUA,
+          mobileWidth: vm.mobileWidth, desktopWidth: vm.desktopWidth,
+          mobileHeight: vm.mobileHeight, mobileDpr: vm.mobileDpr,
+        },
+      });
+    }
+
+    function applyViewport() {
+      if (vmMode === 'auto') return;
+      document.querySelectorAll('meta[name="viewport"]').forEach((el) => { if (!el.hasAttribute('data-vm')) el.remove(); });
+      let meta = document.querySelector('meta[name="viewport"][data-vm]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'viewport');
+        meta.setAttribute('data-vm', '1');
+        (document.head || document.documentElement).appendChild(meta);
+      }
+      meta.setAttribute('content', vmMode === 'desktop' ? 'width=' + vm.desktopWidth : 'width=device-width, initial-scale=1');
+    }
+    function applyFrame() {
+      if (!useFrame || document.getElementById('vm-frame-style')) return;
+      const w = vm.mobileWidth;
+      const style = document.createElement('style');
+      style.id = 'vm-frame-style';
+      style.textContent =
+        'html.vm-framed{background:#202124!important;overflow-x:hidden!important}' +
+        'html.vm-framed>body{width:' + w + 'px!important;min-width:' + w + 'px!important;max-width:' + w + 'px!important;' +
+          'margin:0 auto!important;min-height:100vh!important;overflow-x:hidden!important;' +
+          'box-shadow:0 0 0 100vmax #202124,0 0 40px rgba(0,0,0,.6)!important}';
+      (document.head || document.documentElement).appendChild(style);
+      document.documentElement.classList.add('vm-framed');
+    }
+
+    applyViewport();
+    if (vmMode !== 'auto') {
+      const reassert = () => { applyViewport(); applyFrame(); };
+      document.addEventListener('DOMContentLoaded', reassert);
+      [200, 600, 1500, 3500].forEach((t) => setTimeout(reassert, t));
+    }
+
+    const toggleMode = () => setSiteMode(vmMode === 'desktop' ? 'mobile' : 'desktop');
+
+    function addButton() {
+      if (!vm.showButton || !document.body || document.getElementById('vm-btn')) return;
+      const b = document.createElement('button');
+      b.id = 'vm-btn';
+      b.textContent = vmMode === 'desktop' ? '🖥' : vmMode === 'mobile' ? '📱' : '🔄';
+      b.title = 'View: ' + vmMode + ' - tap: switch · long-press: Auto · drag: move';
+      b.setAttribute('style', BUTTON_CSS + ';background:rgba(0,0,0,.55);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:0.55;left:10px;bottom:10px');
+      b.addEventListener('mouseenter', () => { b.style.opacity = '1'; });
+      b.addEventListener('mouseleave', () => { b.style.opacity = '0.55'; });
+      makeDraggable(b, 'vm_pos', toggleMode, { longPress: { ms: vm.longPressMs, onLong: () => setSiteMode('auto') } });
+      document.body.appendChild(b);
+    }
+    if (document.body) addButton();
+    else document.addEventListener('DOMContentLoaded', addButton);
+
+    onHotkey(() => settings.viewMode.toggleHotkey, toggleMode);
+  }
   function initFacebook() {}
   function initYouTube() {}
   function registerMenu() {}
