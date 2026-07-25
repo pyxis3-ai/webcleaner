@@ -156,7 +156,294 @@
   }
 
   // ============================ Control panel (stub — see Task 6) ============================
-  const Panel = { open() {}, close() {}, refresh() {} };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const cleanHost = (s) => String(s).trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+  const keyLabel = (h) => (h.ctrl ? 'Ctrl+' : '') + (h.alt ? 'Alt+' : '') + (h.shift ? 'Shift+' : '') + String(h.key || '').toUpperCase();
+
+  const swRow = (label, mod, key) =>
+    '<div class="row"><span>' + esc(label) + '</span><label class="sw"><input type="checkbox" data-bool="' + mod + '.' + key + '"' + (settings[mod][key] ? ' checked' : '') + '><span class="track"></span></label></div>';
+  const numRow = (label, mod, key) =>
+    '<div class="row"><span>' + esc(label) + '</span><input class="num" type="number" data-num="' + mod + '.' + key + '" value="' + esc(settings[mod][key]) + '"></div>';
+  const txtRow = (label, mod, key) =>
+    '<div class="frow"><span>' + esc(label) + '</span><input class="txt" type="text" data-txt="' + mod + '.' + key + '" value="' + esc(settings[mod][key]) + '"></div>';
+  const timeRow = (label, mod, key) =>
+    '<div class="row"><span>' + esc(label) + '</span><input class="time" type="time" data-time="' + mod + '.' + key + '" value="' + esc(settings[mod].schedule[key]) + '"></div>';
+  const hotRow = (mod) =>
+    '<div class="row"><span>Shortcut</span><button class="hk" data-hk="' + mod + '">' + esc(keyLabel(settings[mod].toggleHotkey)) + '</button></div>';
+  const listBlock = (label, mod, key, placeholder) =>
+    '<div class="sec"><h2>' + esc(label) + '</h2>' + listHtml(settings[mod][key], mod + '.' + key) +
+    '<div class="add"><input type="text" data-add="' + mod + '.' + key + '" placeholder="' + esc(placeholder) + '"><button data-addbtn="' + mod + '.' + key + '">Add</button></div></div>';
+  function listHtml(arr, path) {
+    if (!arr.length) return '<div class="empty">None yet.</div>';
+    return arr.map((d) => '<div class="item"><span title="' + esc(d) + '">' + esc(d) + '</span>'
+      + '<button class="del" data-del="' + path + '" data-host="' + esc(d) + '">Remove</button></div>').join('');
+  }
+  function packHtml(sites) {
+    const allow = settings.siteBlocker.allow;
+    return sites.map((d) => {
+      const on = allow.includes(d);
+      return '<div class="item"><span>' + esc(d) + '</span><button class="pill ' + (on ? 'allowed' : 'blocked')
+        + '" data-pack="' + esc(d) + '">' + (on ? 'Allowed' : 'Blocked') + '</button></div>';
+    }).join('');
+  }
+
+  function panelStyle() {
+    return '' +
+      ':host{all:initial}' +
+      '*{box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif}' +
+      '.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2147483646}' +
+      '.card{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 28px));max-height:min(86vh,820px);overflow:auto;background:#17181b;color:#e9e9ea;border-radius:14px;padding:18px;box-shadow:0 12px 48px rgba(0,0,0,.6);z-index:2147483647;font-size:14px;line-height:1.4}' +
+      '.hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}' +
+      '.hd h1{font-size:16px;font-weight:700;margin:0}' +
+      '.x{background:none;border:0;color:#9a9aa0;font-size:24px;cursor:pointer;line-height:1;padding:0 4px}' +
+      '.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #26272c}' +
+      '.frow{display:flex;flex-direction:column;gap:5px;padding:9px 0;border-top:1px solid #26272c}' +
+      '.cur{font-size:12px;color:#8a8a90;margin-top:2px}' +
+      '.sec{margin-top:14px}' +
+      '.sec>h2{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8a8a90;margin:0 0 2px}' +
+      '.item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #26272c}' +
+      '.item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.del{background:#2b2b30;border:0;color:#ff8a8a;border-radius:8px;cursor:pointer;padding:4px 10px;font-size:13px;flex:0 0 auto}' +
+      '.add{display:flex;gap:8px;margin-top:8px}' +
+      '.add input{flex:1;min-width:0;background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:8px 10px;font-size:13px}' +
+      '.add button{background:#3a7afe;border:0;color:#fff;border-radius:8px;cursor:pointer;padding:8px 14px;font-size:13px;flex:0 0 auto}' +
+      '.empty{color:#6a6a70;font-style:italic;padding:7px 0;border-top:1px solid #26272c}' +
+      '.sw{position:relative;display:inline-block;width:44px;height:26px;flex:0 0 auto}' +
+      '.sw input{opacity:0;width:0;height:0;position:absolute}' +
+      '.track{position:absolute;inset:0;background:#3a3b42;border-radius:999px;transition:.15s;cursor:pointer}' +
+      '.track::before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}' +
+      '.sw input:checked+.track{background:#2ecc71}' +
+      '.sw input:checked+.track::before{transform:translateX(18px)}' +
+      'details{margin-top:6px}' +
+      'summary{cursor:pointer;padding:9px 0;color:#c9c9cf;border-top:1px solid #26272c;list-style:none;user-select:none;font-weight:600}' +
+      'summary::-webkit-details-marker{display:none}' +
+      '.pill{border:0;border-radius:8px;cursor:pointer;padding:4px 12px;font-size:12px;flex:0 0 auto}' +
+      '.pill.blocked{background:#3a2b2b;color:#ff9a9a}' +
+      '.pill.allowed{background:#243024;color:#9be79b}' +
+      '.num{width:96px;background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:6px 8px;font-size:13px;text-align:right}' +
+      '.time{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:6px 8px;font-size:13px}' +
+      '.txt{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:8px 10px;font-size:12px;width:100%}' +
+      '.hk{background:#2b2b30;border:0;color:#e9e9ea;border-radius:8px;cursor:pointer;padding:5px 12px;font-size:13px}' +
+      '.hk.arm{background:#3a7afe;color:#fff}' +
+      '.seg{display:flex;gap:6px}' +
+      '.seg button{flex:1;background:#2b2b30;border:0;color:#c9c9cf;border-radius:8px;cursor:pointer;padding:6px 0;font-size:13px}' +
+      '.seg button.on{background:#3a7afe;color:#fff}';
+  }
+
+  function secFacebook() {
+    const f = settings.facebook;
+    return '<details data-sec="facebook"><summary>🧹 Facebook  ' + (f.enabled ? 'ON' : 'OFF') + '</summary>' +
+      swRow('Clean feed enabled', 'facebook', 'enabled') +
+      swRow('Hide Sponsored', 'facebook', 'hideSponsored') +
+      swRow('Hide Suggested', 'facebook', 'hideSuggested') +
+      swRow('Hide People You May Know', 'facebook', 'hidePeopleYouMayKnow') +
+      swRow('Hide Reels / Stories trays', 'facebook', 'hideReelsTrays') +
+      swRow('Hide right sidebar', 'facebook', 'hideRightSidebar') +
+      swRow('Hide left sidebar', 'facebook', 'hideLeftSidebar') +
+      swRow('Hide composer', 'facebook', 'hideComposer') +
+      swRow('Hide top bar', 'facebook', 'hideTopBar') +
+      swRow('Strip tracking / unwrap l.php', 'facebook', 'stripTracking') +
+      swRow('Skip Reel ads', 'facebook', 'skipReelsAds') +
+      swRow('Force Most Recent feed', 'facebook', 'forceMostRecent') +
+      swRow('Show floating button', 'facebook', 'showToggleButton') +
+      listBlock('Extra junk phrases', 'facebook', 'extraJunkPhrases', 'add a phrase to hide') +
+      '<details data-sec="facebook-adv"><summary>Advanced</summary>' + hotRow('facebook') + '</details>' +
+      '</details>';
+  }
+  function secYouTube() {
+    const y = settings.youtube;
+    return '<details data-sec="youtube"><summary>⏭ YouTube  ' + (y.enabled ? 'ON' : 'OFF') + '</summary>' +
+      swRow('Ad-skipping enabled', 'youtube', 'enabled') +
+      swRow('Skip video ads', 'youtube', 'skipVideoAds') +
+      swRow('Skip Shorts ads', 'youtube', 'skipShortsAds') +
+      swRow('Hide feed ads', 'youtube', 'hideFeedAds') +
+      swRow('Hide banners / overlays', 'youtube', 'hideBanners') +
+      swRow('Mute ads', 'youtube', 'muteAds') +
+      swRow('Dismiss anti-adblock popup', 'youtube', 'dismissAntiAdblock') +
+      swRow('Show floating button', 'youtube', 'showToggleButton') +
+      '<details data-sec="youtube-adv"><summary>Advanced</summary>' + hotRow('youtube') + '</details>' +
+      '</details>';
+  }
+  function secSiteBlocker() {
+    const sb = settings.siteBlocker;
+    return '<details data-sec="siteBlocker" open><summary>⛔ Site Blocker  ' + (sb.enabled ? 'ON' : 'OFF') + '</summary>' +
+      '<div class="row"><div>Blocking<div class="cur">This page: ' + esc(host) + '</div></div><label class="sw"><input type="checkbox" data-bool="siteBlocker.enabled"' + (sb.enabled ? ' checked' : '') + '><span class="track"></span></label></div>' +
+      swRow('Adult filter', 'siteBlocker', 'blockAdult') +
+      swRow('Focus mode now', 'siteBlocker', 'blockFocus') +
+      swRow('Work-hours schedule (' + esc(sb.schedule.from) + '–' + esc(sb.schedule.to) + ')', 'siteBlocker', 'scheduleOn') +
+      (sbSnoozed() ? '<div class="cur">⏱ Snoozed — blocking is paused on this tab.</div>' : '') +
+      listBlock('My blocked sites', 'siteBlocker', 'custom', 'add a site, e.g. example.com') +
+      listBlock('Allowed (never blocked)', 'siteBlocker', 'allow', 'add a site to always allow') +
+      '<div class="sec"><h2>Built-in packs</h2>' +
+        '<details data-sec="focus"><summary>Focus Pack (' + FOCUS_PACK.length + ')</summary>' + packHtml(FOCUS_PACK) + '</details>' +
+        '<details data-sec="adult"><summary>Adult Pack (' + ADULT_PACK.length + ')</summary>' + packHtml(ADULT_PACK) + '</details>' +
+      '</div>' +
+      '<details data-sec="siteBlocker-adv"><summary>Advanced</summary>' +
+        timeRow('Schedule from', 'siteBlocker', 'from') + timeRow('Schedule to', 'siteBlocker', 'to') +
+        numRow('Snooze minutes', 'siteBlocker', 'snoozeMinutes') + hotRow('siteBlocker') +
+      '</details>' +
+      '</details>';
+  }
+  function secViewMode() {
+    const seg = (m) => '<button class="' + (vmMode === m ? 'on' : '') + '" data-mode="' + m + '">' + (m[0].toUpperCase() + m.slice(1)) + '</button>';
+    const dseg = (m) => '<button class="' + (settings.viewMode.newSiteDefault === m ? 'on' : '') + '" data-default="' + m + '">' + (m[0].toUpperCase() + m.slice(1)) + '</button>';
+    return '<details data-sec="viewMode"><summary>🖥 View Mode  ' + vmMode.toUpperCase() + '</summary>' +
+      '<div class="row"><span>This site</span><div class="seg">' + seg('desktop') + seg('mobile') + seg('auto') + '</div></div>' +
+      '<div class="row"><span>New-site default</span><div class="seg">' + dseg('desktop') + dseg('mobile') + dseg('auto') + '</div></div>' +
+      swRow('Spoof User-Agent', 'viewMode', 'spoofUA') +
+      swRow('Spoof touch', 'viewMode', 'spoofTouch') +
+      swRow('Spoof matchMedia', 'viewMode', 'spoofMedia') +
+      swRow('Phone frame on desktop', 'viewMode', 'frameOnDesktop') +
+      swRow('Show floating button', 'viewMode', 'showButton') +
+      '<details data-sec="viewMode-adv"><summary>Advanced</summary>' +
+        numRow('Desktop width', 'viewMode', 'desktopWidth') + numRow('Mobile width', 'viewMode', 'mobileWidth') +
+        numRow('Mobile height', 'viewMode', 'mobileHeight') + numRow('Mobile DPR', 'viewMode', 'mobileDpr') +
+        numRow('Long-press ms', 'viewMode', 'longPressMs') +
+        txtRow('Mobile UA', 'viewMode', 'mobileUA') + txtRow('Desktop UA', 'viewMode', 'desktopUA') +
+        hotRow('viewMode') +
+      '</details>' +
+      '</details>';
+  }
+
+  const Panel = (function () {
+    let hostEl = null;
+    let armedHk = null;
+
+    function onKey(e) {
+      if (armedHk) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    }
+    function affectsFor(mod) {
+      if (mod === 'siteBlocker') return 'block';
+      if (mod === 'facebook') return FB_HOSTS.has(host);
+      if (mod === 'youtube') return YT_HOSTS.has(host);
+      if (mod === 'viewMode') return viewModeActive();
+      return false;
+    }
+    function edit(mod, mutate) { armedHk = null; applyEdit(mod, mutate, affectsFor(mod)); }
+
+    function render() {
+      const shadow = hostEl.shadowRoot;
+      const open = {};
+      shadow.querySelectorAll('details[data-sec]').forEach((d) => { open[d.getAttribute('data-sec')] = d.open; });
+      shadow.innerHTML = '<style>' + panelStyle() + '</style>' +
+        '<div class="backdrop" data-close></div>' +
+        '<div class="card" role="dialog" aria-label="Web Cleaner settings">' +
+          '<div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-close aria-label="Close">×</button></div>' +
+          secSiteBlocker() + secViewMode() + secFacebook() + secYouTube() +
+        '</div>';
+      shadow.querySelectorAll('details[data-sec]').forEach((d) => { if (open[d.getAttribute('data-sec')]) d.open = true; });
+      wire(shadow);
+    }
+
+    function wire(shadow) {
+      shadow.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', close));
+
+      shadow.querySelectorAll('[data-bool]').forEach((el) => el.addEventListener('change', () => {
+        const [mod, key] = el.getAttribute('data-bool').split('.');
+        if (mod === 'facebook' && key === 'enabled') { setFacebookEnabled(el.checked); render(); return; }
+        if (mod === 'youtube' && key === 'enabled') { setYoutubeEnabled(el.checked); render(); return; }
+        edit(mod, () => { settings[mod][key] = el.checked; });
+      }));
+
+      shadow.querySelectorAll('[data-num]').forEach((el) => el.addEventListener('change', () => {
+        const [mod, key] = el.getAttribute('data-num').split('.');
+        const v = parseFloat(el.value);
+        if (!isFinite(v) || v <= 0) { render(); return; }
+        edit(mod, () => { settings[mod][key] = v; });
+      }));
+
+      shadow.querySelectorAll('[data-txt]').forEach((el) => el.addEventListener('change', () => {
+        const [mod, key] = el.getAttribute('data-txt').split('.');
+        const v = el.value.trim();
+        if (!v) { render(); return; }
+        edit(mod, () => { settings[mod][key] = v; });
+      }));
+
+      shadow.querySelectorAll('[data-time]').forEach((el) => el.addEventListener('change', () => {
+        const [mod, key] = el.getAttribute('data-time').split('.');
+        if (!/^\d{2}:\d{2}$/.test(el.value)) { render(); return; }
+        edit('siteBlocker', () => { settings.siteBlocker.schedule[key] = el.value; });
+      }));
+
+      shadow.querySelectorAll('[data-del]').forEach((el) => el.addEventListener('click', () => {
+        const [mod, key] = el.getAttribute('data-del').split('.');
+        const h = el.getAttribute('data-host');
+        edit(mod, () => { settings[mod][key] = settings[mod][key].filter((d) => d !== h); });
+      }));
+
+      shadow.querySelectorAll('[data-addbtn]').forEach((btn) => {
+        const path = btn.getAttribute('data-addbtn');
+        const [mod, key] = path.split('.');
+        const input = shadow.querySelector('[data-add="' + path + '"]');
+        const submit = () => {
+          const raw = input.value;
+          const h = (mod === 'facebook') ? raw.trim().toLowerCase() : cleanHost(raw);
+          if (!h) return;
+          edit(mod, () => {
+            const arr = settings[mod][key];
+            if (!arr.includes(h)) arr.push(h);
+            if (mod === 'siteBlocker' && key === 'custom') settings.siteBlocker.allow = settings.siteBlocker.allow.filter((d) => d !== h);
+            if (mod === 'siteBlocker' && key === 'allow') settings.siteBlocker.custom = settings.siteBlocker.custom.filter((d) => d !== h);
+          });
+        };
+        btn.addEventListener('click', submit);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+      });
+
+      shadow.querySelectorAll('[data-pack]').forEach((btn) => btn.addEventListener('click', () => {
+        const h = btn.getAttribute('data-pack');
+        edit('siteBlocker', () => {
+          const a = settings.siteBlocker.allow;
+          settings.siteBlocker.allow = a.includes(h) ? a.filter((d) => d !== h) : a.concat(h);
+        });
+      }));
+
+      shadow.querySelectorAll('[data-mode]').forEach((btn) => btn.addEventListener('click', () => setSiteMode(btn.getAttribute('data-mode'))));
+      shadow.querySelectorAll('[data-default]').forEach((btn) => btn.addEventListener('click', () => {
+        edit('viewMode', () => { settings.viewMode.newSiteDefault = btn.getAttribute('data-default'); });
+      }));
+
+      shadow.querySelectorAll('[data-hk]').forEach((btn) => btn.addEventListener('click', () => {
+        const mod = btn.getAttribute('data-hk');
+        armedHk = mod;
+        btn.textContent = 'Press keys…';
+        btn.classList.add('arm');
+        const cap = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+          if (e.metaKey || !(e.altKey || e.ctrlKey || e.shiftKey)) {
+            armedHk = null; window.removeEventListener('keydown', cap, true); render(); return;
+          }
+          window.removeEventListener('keydown', cap, true);
+          armedHk = null;
+          const spec = { ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, key: e.key.toLowerCase() };
+          applyEdit(mod, () => { settings[mod].toggleHotkey = spec; }, false);
+        };
+        window.addEventListener('keydown', cap, true);
+      }));
+    }
+
+    function open() {
+      if (hostEl) { close(); return; }
+      if (!document.body) return;
+      hostEl = document.createElement('div');
+      hostEl.id = 'wc-panel-root';
+      hostEl.setAttribute('style', 'all:initial');
+      hostEl.attachShadow({ mode: 'open' });
+      document.body.appendChild(hostEl);
+      render();
+      document.addEventListener('keydown', onKey, true);
+    }
+    function close() {
+      if (hostEl) { hostEl.remove(); hostEl = null; }
+      armedHk = null;
+      document.removeEventListener('keydown', onKey, true);
+    }
+    function refresh() { if (hostEl && hostEl.shadowRoot) render(); }
+
+    return { open, close, refresh };
+  })();
 
   // ============================ Cross-module functions (filled by later tasks) ============================
   const FOCUS_PACK = [
