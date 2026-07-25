@@ -380,7 +380,331 @@
 
     onHotkey(() => settings.viewMode.toggleHotkey, toggleMode);
   }
-  function initFacebook() {}
+  function setFacebookEnabled(on) {
+    settings.facebook.enabled = on;
+    saveModule('facebook');
+    document.documentElement.classList.toggle('fcf-off', !on);
+    const b = document.getElementById('fcf-toggle');
+    if (b) b.style.opacity = on ? '1' : '0.4';
+  }
+
+  function initFacebook() {
+    const IS_MOBILE = location.hostname === 'm.facebook.com';
+    if (!settings.facebook.enabled) document.documentElement.classList.add('fcf-off');
+
+    if (!IS_MOBILE && settings.facebook.forceMostRecent) {
+      const onHome = location.pathname === '/' || location.pathname === '/home.php';
+      if (onHome && !/[?&]sk=/.test(location.search)) {
+        location.replace(location.origin + '/?sk=h_chr');
+        return;
+      }
+    }
+
+    const norm = (s) => String(s).normalize('NFKC').toLowerCase().replace(/[^\p{L}]/gu, '');
+    const SPONSORED_MARKS = ['sponsored', 'paidpartnership', 'publicidad', 'patrocinado', 'sponsoris', 'commandit', 'gesponsert', 'sponsorizzat', 'gesponsord', 'bersponsor', 'sponsorlu', 'sponsorowan', 'sponsrad', 'sponset', 'sponsoreret', 'ممول', 'ממומן', 'реклама', '広告', '광고', '赞助', '贊助', 'χορηγούμενη'].map(norm);
+    const INCLUDE_MARKS = [
+      ...(settings.facebook.hideSponsored ? SPONSORED_MARKS : []),
+      ...(settings.facebook.hideSuggested ? ['suggestedforyou', 'suggestedpost', 'pagesforyou', 'pagesyoumaylike', 'groupsyoumaylike'] : []),
+      ...(settings.facebook.hidePeopleYouMayKnow ? ['peopleyoumayknow'] : []),
+      ...settings.facebook.extraJunkPhrases.map(norm),
+    ];
+    const EXACT_MARKS = settings.facebook.hideReelsTrays ? ['reels', 'reelsandshortvideos', 'stories'] : [];
+
+    function injectStyle() {
+      const R = ['html:not(.fcf-off) [data-fcf-hide]{display:none!important}'];
+      if (!IS_MOBILE) {
+        const P = 'html.fcf-strip:not(.fcf-off) ';
+        if (settings.facebook.hideRightSidebar) R.push(P + '[role="complementary"]{display:none!important}');
+        if (settings.facebook.hideLeftSidebar)  R.push(P + '[role="navigation"][aria-label="Shortcuts"]{display:none!important}');
+        if (settings.facebook.hideLeftSidebar)  R.push('html:not(.fcf-off) [data-fcf-leftnav]{display:none!important}');
+        if (settings.facebook.hideComposer)     R.push(P + '[role="region"][aria-label="Create a post"]{display:none!important}');
+        if (settings.facebook.hideTopBar)       R.push(P + '[role="banner"],' + P + '[role="navigation"][aria-label="Facebook"],' + P + '[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}');
+        if (settings.facebook.hideReelsTrays)   R.push(P + '[aria-label="Stories"],' + P + '[aria-label="Reels"]{display:none!important}');
+        R.push(P + '[role="main"]{margin-left:auto!important;margin-right:auto!important}');
+        if (settings.facebook.hideTopBar)       R.push(P + 'body{padding-top:0!important}');
+      }
+      if (settings.facebook.showToggleButton) R.push('#fcf-toggle{position:fixed;z-index:2147483647;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;font-size:18px;line-height:40px;padding:0;background:#fff;color:#111;box-shadow:0 2px 10px rgba(0,0,0,.35);touch-action:none;transition:transform .1s}');
+      const style = document.createElement('style');
+      style.id = 'fcf-style';
+      style.textContent = R.join('\n');
+      (document.head || document.documentElement).appendChild(style);
+    }
+
+    const STRIP = /[​-‏‪-‮﻿­⁠]/g;
+    function renderedText(scope, bandTop, bandBottom) {
+      const glyphs = [];
+      const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+      let n, budget = 600;
+      while ((n = walker.nextNode()) && budget-- > 0) {
+        const s = n.nodeValue;
+        if (!s || !s.trim()) continue;
+        const p = n.parentElement;
+        if (!p) continue;
+        const cs = getComputedStyle(p);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || cs.fontSize === '0px') continue;
+        if (p.closest('[aria-hidden="true"]')) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        const r = range.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) continue;
+        if (r.right <= 0) continue;
+        if (r.top < bandTop || r.top > bandBottom) continue;
+        glyphs.push({ c: s.trim(), top: Math.round(r.top), left: Math.round(r.left) });
+      }
+      const buckets = new Map();
+      for (const g of glyphs) {
+        const k = g.top + ':' + g.left;
+        (buckets.get(k) || buckets.set(k, []).get(k)).push(g);
+      }
+      const kept = [];
+      for (const arr of buckets.values()) if (arr.length === 1) kept.push(arr[0]);
+      kept.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+      return kept.map((g) => g.c).join('').replace(STRIP, '').replace(/\s+/g, ' ').trim();
+    }
+
+    let _feed = null;
+    function feedContainer() {
+      if (_feed && _feed.isConnected && countStoryChildren(_feed) >= 2) return _feed;
+      const main = document.querySelector('[role="main"]');
+      if (!main) return null;
+      let best = null, bestN = 1;
+      for (const d of main.querySelectorAll('div')) {
+        const n = countStoryChildren(d);
+        if (n > bestN) { bestN = n; best = d; }
+      }
+      return (_feed = best);
+    }
+    function countStoryChildren(el) {
+      let n = 0;
+      for (const ch of el.children) {
+        const r = ch.getBoundingClientRect();
+        if (r.width >= 500 && r.width <= 720 && r.height > 90) n++;
+      }
+      return n;
+    }
+
+    const VIEWPAD = 500;
+    const HEADER_BAND = 130;
+    const CLEAN_CONFIRMATIONS = 4;
+    function isJunkHeader(compact) {
+      if (!compact) return false;
+      for (const m of INCLUDE_MARKS) if (compact.includes(m)) return true;
+      return EXACT_MARKS.includes(compact);
+    }
+
+    function processStories() {
+      const feed = feedContainer();
+      if (!feed) return;
+      const vh = window.innerHeight;
+      for (const story of feed.children) {
+        if (story.__fcf === 'hidden') continue;
+        if (story.__fcf === 'clean') continue;
+        const r = story.getBoundingClientRect();
+        if (r.height < 60) continue;
+        if (r.bottom < -VIEWPAD || r.top > vh + VIEWPAD) continue;
+        const header = renderedText(story, r.top - 2, r.top + HEADER_BAND);
+        if (!header) continue;
+        const junk = isJunkHeader(norm(header)) ||
+          (settings.facebook.hideReelsTrays && story.querySelectorAll('a[href*="/reel/"]').length > 3);
+        if (junk) {
+          story.setAttribute('data-fcf-hide', '');
+          story.__fcf = 'hidden';
+        } else if ((story.__fcfSeen = (story.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
+          story.__fcf = 'clean';
+        }
+      }
+    }
+
+    function hideLeftRail() {
+      if (!settings.facebook.hideLeftSidebar) return;
+      for (const nav of document.querySelectorAll('[role="navigation"]:not([data-fcf-leftnav])')) {
+        const r = nav.getBoundingClientRect();
+        if (r.height > 350 && r.width >= 150 && r.width <= 460 && r.left <= 24)
+          nav.setAttribute('data-fcf-leftnav', '');
+      }
+    }
+
+    function hardenStructure() {
+      const main = document.querySelector('[role="main"]');
+      if (!main) return;
+      const mr = main.getBoundingClientRect();
+      if (settings.facebook.hideLeftSidebar) {
+        for (const nav of document.querySelectorAll('[role="navigation"]')) {
+          const r = nav.getBoundingClientRect();
+          if (r.height > 350 && r.width > 120 && r.right <= mr.left + 8)
+            nav.setAttribute('data-fcf-leftnav', '');
+        }
+      }
+    }
+
+    const MOBILE_POST = '[data-tracking-duration-id]';
+    const MOBILE_LABELS = 'span, a[role="link"], h3, h4, div[role="heading"]';
+    function mobilePostIsJunk(post) {
+      for (const el of post.querySelectorAll(MOBILE_LABELS)) {
+        const raw = (el.textContent || '').trim();
+        if (!raw || raw.length > 40) continue;
+        const t = norm(raw);
+        if (!t) continue;
+        if (INCLUDE_MARKS.some((m) => t === m || t.startsWith(m))) return true;
+        if (EXACT_MARKS.includes(t)) return true;
+      }
+      return false;
+    }
+    function sweepMobile() {
+      for (const post of document.querySelectorAll(MOBILE_POST)) {
+        if (post.__fcf) continue;
+        if (mobilePostIsJunk(post)) {
+          post.setAttribute('data-fcf-hide', '');
+          post.__fcf = 'hidden';
+        } else if ((post.__fcfSeen = (post.__fcfSeen || 0) + 1) >= CLEAN_CONFIRMATIONS) {
+          post.__fcf = 'clean';
+        }
+      }
+    }
+
+    function addToggle() {
+      if (!settings.facebook.showToggleButton || !document.body || document.getElementById('fcf-toggle')) return;
+      const b = document.createElement('button');
+      b.id = 'fcf-toggle';
+      b.textContent = '🧹';
+      b.title = 'Facebook Clean Feed - tap: toggle · drag: move';
+      makeDraggable(b, 'fcf_pos', () => setFacebookEnabled(!settings.facebook.enabled));
+      document.body.appendChild(b);
+      if (!settings.facebook.enabled) b.style.opacity = '0.4';
+    }
+
+    // Ad tracking is keyed on the centered <video> element (node identity), NOT the URL
+    // path. Facebook gates its Reels ads and snap-scrolls back to them, and the path does
+    // not reliably change per reel — so keying on the path meant one nudge got reverted and
+    // the ad was then marked "handled" forever. Keying on the element lets us keep retrying a
+    // snapped-back ad and reset cleanly only once we actually land on a different reel.
+    const _reelState = new WeakMap();
+    let _skipTarget = null, _lastSkip = 0, _skipTries = 0;
+    const SKIP_RETRY_MS = 600;
+    const SKIP_MAX_TRIES = 8;
+    function handleReels() {
+      if (!settings.facebook.skipReelsAds || !/^\/reels?(\/|$)/.test(location.pathname)) return;
+      const cy = window.innerHeight / 2;
+      let active = null, best = 1e9;
+      for (const v of document.querySelectorAll('video')) {
+        const r = v.getBoundingClientRect();
+        if (r.height < 200) continue;
+        const d = Math.abs((r.top + r.bottom) / 2 - cy);
+        if (d < best) { best = d; active = v; }
+      }
+      if (!active) return;
+      let reel = active;
+      for (let i = 0; i < 12 && reel.parentElement; i++) {
+        reel = reel.parentElement;
+        if (reel.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]')) break;
+      }
+      if (!reelIsSponsored(reel, active)) {
+        if (active !== _skipTarget) { _skipTarget = null; _skipTries = 0; }  // landed on a clean reel
+        return;
+      }
+      if (active !== _skipTarget) { _skipTarget = active; _skipTries = 0; }  // a (new) ad is centered
+      if (Date.now() - _lastSkip < SKIP_RETRY_MS || _skipTries >= SKIP_MAX_TRIES) return;
+      _skipTries++; _lastSkip = Date.now();
+      advancePastReel(reel);
+    }
+
+    function advancePastReel(reel) {
+      const next = document.querySelector('[role="button"][aria-label="Next Card"]');
+      if (next) { next.click(); return; }
+      const target = reel.closest('[tabindex]') || reel;  // FB's key handler lives on the reel, not document
+      for (const type of ['keydown', 'keyup']) {
+        target.dispatchEvent(new KeyboardEvent(type, {
+          key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true,
+        }));
+      }
+    }
+
+    function reelIsSponsored(reel, key) {
+      let st = _reelState.get(key);
+      if (!st) _reelState.set(key, (st = { spon: false, tries: 0 }));
+      if (st.spon) return true;
+      if (st.tries >= 8) return false;
+      st.tries++;
+      const r = reel.getBoundingClientRect();
+      const c = norm(renderedText(reel, r.top - 2, r.bottom + 2));
+      if (SPONSORED_MARKS.some((m) => c.includes(m))) st.spon = true;
+      return st.spon;
+    }
+
+    const TRACK_EXACT = new Set(['fbclid', 'gclid', 'dclid', 'gbraid', 'wbraid', 'msclkid', 'yclid', 'twclid', 'igshid', 'mc_eid', 'mc_cid', '_openstat', 'vero_id', 'oly_enc_id', 'oly_anon_id', 'wickedid', '_hsenc', '_hsmi', 'mkt_tok', 'ref', 'refsrc', 'refid', 'fref', 'hc_ref', 'hc_location', 'ref_src', 'ref_url', 'eav', 'paipv', 'comment_tracking', 'av', 'rdid']);
+    const FB_SHIMS = new Set(['l.facebook.com', 'lm.facebook.com', 'l.messenger.com']);
+    const isTrackingParam = (k) => TRACK_EXACT.has(k) || k.startsWith('utm_') || k.startsWith('__');
+    function cleanUrl(href) {
+      let u;
+      try { u = new URL(href, location.href); } catch (e) { return null; }
+      let dirty = false;
+      if (FB_SHIMS.has(u.hostname) && u.pathname === '/l.php') {
+        const real = u.searchParams.get('u');
+        if (real) {
+          try {
+            const r = new URL(real);
+            if (r.protocol === 'https:' || r.protocol === 'http:') { u = r; dirty = true; }
+          } catch (e) {}
+        }
+      }
+      for (const k of [...u.searchParams.keys()]) {
+        if (isTrackingParam(k)) { u.searchParams.delete(k); dirty = true; }
+      }
+      return dirty ? u.toString() : null;
+    }
+    function cleanTracking() {
+      const here = cleanUrl(location.href);
+      if (here) history.replaceState(history.state, '', here);
+      for (const a of document.querySelectorAll('a[href^="http"]:not([data-fcf-clean])')) {
+        a.setAttribute('data-fcf-clean', '');
+        const cleaned = cleanUrl(a.getAttribute('data-lynx-uri') || a.href);
+        if (cleaned) a.href = cleaned;
+        a.removeAttribute('ping');
+        a.removeAttribute('data-lynx-uri');
+      }
+    }
+
+    function isFeedPage() {
+      const p = location.pathname;
+      return p === '/' || p === '/home.php';
+    }
+    function isCleanPage() {
+      const p = location.pathname.replace(/\/$/, '');
+      return isFeedPage() || p === '/groups/feed' || p === '/watch' || /^\/groups\/[^/]+$/.test(p);
+    }
+    function sweep() {
+      try {
+        if (settings.facebook.stripTracking) cleanTracking();
+        if (IS_MOBILE) { sweepMobile(); return; }
+        hideLeftRail();
+        document.documentElement.classList.toggle('fcf-strip', isFeedPage());
+        if (isCleanPage()) { hardenStructure(); processStories(); }
+        handleReels();
+      } catch (e) { console.warn('[FCF]', e); }
+    }
+    let scheduled = false;
+    const idle = window.requestIdleCallback || ((fn) => requestAnimationFrame(fn));
+    function schedule() {
+      if (scheduled) return;
+      scheduled = true;
+      idle(() => { scheduled = false; sweep(); });
+    }
+
+    function start() {
+      sweep();
+      addToggle();
+      new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+      window.addEventListener('scroll', schedule, { passive: true });
+      setInterval(sweep, IS_MOBILE ? 1000 : 1500);
+    }
+
+    onHotkey(() => settings.facebook.toggleHotkey, () => setFacebookEnabled(!settings.facebook.enabled));
+
+    injectStyle();
+    if (!IS_MOBILE) document.documentElement.classList.toggle('fcf-strip', isFeedPage());
+    if (document.body) start();
+    else document.addEventListener('DOMContentLoaded', start);
+  }
   function initYouTube() {}
   function registerMenu() {}
 
