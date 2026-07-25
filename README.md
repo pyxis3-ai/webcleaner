@@ -26,7 +26,7 @@ Install **Web Cleaner**, then remove the old **Facebook Clean Feed**, **YouTube 
 |---|---|
 | **⚙ Web Cleaner settings…** panel (from the manager menu) | every feature toggle, site list, schedule, hotkey, and tuning value - persisted to your manager's storage, no file editing |
 | Toggle hotkey | each module (table below); rebindable in the panel |
-| Draggable on-page button (remembers its spot) | Facebook 🧹 · YouTube ⏭ · View Switcher 🖥/📱 |
+| Draggable on-page button (remembers its spot) | Facebook 🧹, YouTube ⏭, View Switcher 🖥/📱 |
 | Userscript-manager menu | ⚙ settings panel + quick actions: toggle Facebook / YouTube / blocking, block or allow this site, switch View mode |
 
 Site Blocker deliberately has no floating button - it matches every page on the web, so its controls live in the manager menu, the hotkey, the settings panel, and the block screen itself.
