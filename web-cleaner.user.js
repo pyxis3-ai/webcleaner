@@ -159,10 +159,79 @@
   const Panel = { open() {}, close() {}, refresh() {} };
 
   // ============================ Cross-module functions (filled by later tasks) ============================
-  function blockReason() { return null; }            // Task 2 replaces this body
+  const FOCUS_PACK = [
+    'facebook.com', 'youtube.com', 'instagram.com', 'tiktok.com', 'x.com', 'twitter.com', 'reddit.com',
+    'snapchat.com', 'threads.net', 'pinterest.com', 'tumblr.com', 'linkedin.com',
+    'twitch.tv', 'netflix.com', 'hulu.com', 'dailymotion.com',
+    'news.ycombinator.com', 'cnn.com', 'bbc.com', 'dailymail.co.uk', 'foxnews.com', 'buzzfeed.com',
+    '9gag.com', 'imgur.com', 'boredpanda.com',
+    'amazon.com', 'ebay.com', 'aliexpress.com', 'temu.com', 'shein.com',
+  ];
+  const ADULT_PACK = ['pornhub.com', 'xvideos.com', 'xnxx.com', 'xhamster.com', 'redtube.com', 'youporn.com',
+    'spankbang.com', 'onlyfans.com', 'chaturbate.com', 'stripchat.com'];
+  const ADULT_RE = /(porn|xvideos|xhamster|hentai|camsoda|chaturbate|brazzers|onlyfans|nsfw|sexcam|sextube|camgirl)/i;
+
+  const sbHost = () => location.hostname.replace(/^www\./, '');
+  const sbInList = (list) => { const h = sbHost(); return list.some((d) => h === d || h.endsWith('.' + d)); };
+  const sbSnoozed = () => { try { return Date.now() < parseInt(localStorage.getItem('sb_snooze') || '0', 10); } catch (e) { return false; } };
+  const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+  function sbInSchedule() {
+    const sb = settings.siteBlocker, s = sb.schedule;
+    if (!sb.scheduleOn || !s.days.includes(new Date().getDay())) return false;
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const from = toMin(s.from), to = toMin(s.to);
+    return from <= to ? (cur >= from && cur < to) : (cur >= from || cur < to);
+  }
+
+  function blockReason() {
+    const sb = settings.siteBlocker;
+    if (!sb.enabled || sbSnoozed()) return null;
+    if (sbInList(sb.allow)) return null;
+    if (sbInList(sb.custom)) return 'on your block list';
+    if (sb.blockAdult && (sbInList(ADULT_PACK) || ADULT_RE.test(sbHost()))) return 'blocked by the adult filter';
+    if ((sb.blockFocus || sbInSchedule()) && sbInList(FOCUS_PACK))
+      return sb.blockFocus ? 'blocked by the focus filter' : 'blocked during focus hours';
+    return null;
+  }
 
   // ============================ Feature modules (filled by later tasks) ============================
-  function initSiteBlocker() {}
+  function initSiteBlocker() {
+    function showBlock(why) {
+      try { window.stop(); } catch (e) {}
+      document.documentElement.innerHTML =
+        '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Blocked</title></head><body></body>';
+      const b = document.body;
+      Object.assign(b.style, {
+        margin: '0', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: '14px', textAlign: 'center', padding: '24px',
+        fontFamily: 'system-ui,-apple-system,sans-serif', background: '#0b0b0c', color: '#e9e9ea',
+      });
+      b.innerHTML =
+        '<div style="font-size:56px">⛔</div>' +
+        '<div style="font-size:22px;font-weight:600">Blocked</div>' +
+        '<div style="opacity:.65;max-width:30rem">' + sbHost() + ' - ' + why + '.</div>' +
+        '<button id="sb-allow" style="margin-top:6px;padding:10px 18px;border:0;border-radius:10px;cursor:pointer;font-size:14px;background:#2b2b30;color:#e9e9ea">Allow for ' + settings.siteBlocker.snoozeMinutes + ' minutes</button>' +
+        '<button id="sb-manage" style="padding:8px 16px;border:0;border-radius:10px;cursor:pointer;font-size:13px;background:#1c1c20;color:#9a9aa0">⚙ Manage blocked sites</button>';
+      const allowBtn = document.getElementById('sb-allow');
+      if (allowBtn) allowBtn.addEventListener('click', () => {
+        try { localStorage.setItem('sb_snooze', String(Date.now() + settings.siteBlocker.snoozeMinutes * 60000)); } catch (e) {}
+        location.reload();
+      });
+      const mng = document.getElementById('sb-manage');
+      if (mng) mng.addEventListener('click', Panel.open);
+    }
+    function check() {
+      const why = blockReason();
+      if (why && !document.getElementById('sb-allow')) showBlock(why);
+    }
+    check();
+    setInterval(check, 30000);
+
+    onHotkey(() => settings.siteBlocker.toggleHotkey, () => {
+      applyEdit('siteBlocker', () => { settings.siteBlocker.enabled = !settings.siteBlocker.enabled; }, 'block');
+    });
+  }
   function initViewMode() {}
   function initFacebook() {}
   function initYouTube() {}
