@@ -1133,7 +1133,37 @@
 
     onHotkey(() => settings.youtube.toggleHotkey, () => setYoutubeEnabled(!settings.youtube.enabled));
   }
-  function registerMenu() {}
+  function registerMenu() {
+    if (typeof GM_registerMenuCommand !== 'function') return;
+    const sbHostName = location.hostname.replace(/^www\./, '');
+    GM_registerMenuCommand('⚙ Web Cleaner settings…', Panel.open);
+    GM_registerMenuCommand((settings.siteBlocker.enabled ? '⛔ Blocking: ON' : '✅ Blocking: OFF') + ' - toggle', () => {
+      applyEdit('siteBlocker', () => { settings.siteBlocker.enabled = !settings.siteBlocker.enabled; }, 'block');
+    });
+    GM_registerMenuCommand('➕ Block this site (' + sbHostName + ')', () => {
+      applyEdit('siteBlocker', () => {
+        if (!settings.siteBlocker.custom.includes(sbHostName)) settings.siteBlocker.custom.push(sbHostName);
+        settings.siteBlocker.allow = settings.siteBlocker.allow.filter((d) => d !== sbHostName);
+      }, 'block');
+    });
+    GM_registerMenuCommand('➖ Allow this site (' + sbHostName + ')', () => {
+      applyEdit('siteBlocker', () => {
+        if (!settings.siteBlocker.allow.includes(sbHostName)) settings.siteBlocker.allow.push(sbHostName);
+        settings.siteBlocker.custom = settings.siteBlocker.custom.filter((d) => d !== sbHostName);
+      }, 'block');
+    });
+    if (FB_HOSTS.has(host)) {
+      GM_registerMenuCommand('🧹 Facebook clean feed: ' + (settings.facebook.enabled ? 'ON' : 'OFF') + ' - toggle',
+        () => setFacebookEnabled(!settings.facebook.enabled));
+    }
+    if (YT_HOSTS.has(host)) {
+      GM_registerMenuCommand('⏭ YouTube skip-ads: ' + (settings.youtube.enabled ? 'ON' : 'OFF') + ' - toggle',
+        () => setYoutubeEnabled(!settings.youtube.enabled));
+    }
+    GM_registerMenuCommand('🖥 View: Desktop (this site)', () => setSiteMode('desktop'));
+    GM_registerMenuCommand('📱 View: Mobile (this site)', () => setSiteMode('mobile'));
+    GM_registerMenuCommand('↺ View: Auto (this site)', () => setSiteMode('auto'));
+  }
 
   // ============================ Bootstrap ============================
   const host = location.hostname;
