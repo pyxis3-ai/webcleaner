@@ -155,7 +155,7 @@
     } catch (e) { console.warn('[WC inject]', e); }
   }
 
-  // ============================ Control panel (stub — see Task 6) ============================
+  // ============================ Control panel (stub - see Task 6) ============================
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const cleanHost = (s) => String(s).trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
   const keyLabel = (h) => (h.ctrl ? 'Ctrl+' : '') + (h.alt ? 'Alt+' : '') + (h.shift ? 'Shift+' : '') + String(h.key || '').toUpperCase();
@@ -271,7 +271,7 @@
       swRow('Adult filter', 'siteBlocker', 'blockAdult') +
       swRow('Focus mode now', 'siteBlocker', 'blockFocus') +
       swRow('Work-hours schedule (' + esc(sb.schedule.from) + '–' + esc(sb.schedule.to) + ')', 'siteBlocker', 'scheduleOn') +
-      (sbSnoozed() ? '<div class="cur">⏱ Snoozed — blocking is paused on this tab.</div>' : '') +
+      (sbSnoozed() ? '<div class="cur">⏱ Snoozed - blocking is paused on this tab.</div>' : '') +
       listBlock('My blocked sites', 'siteBlocker', 'custom', 'add a site, e.g. example.com') +
       listBlock('Allowed (never blocked)', 'siteBlocker', 'allow', 'add a site to always allow') +
       '<div class="sec"><h2>Built-in packs</h2>' +
@@ -655,7 +655,7 @@
       const b = document.createElement('button');
       b.id = 'vm-btn';
       b.textContent = vmMode === 'desktop' ? '🖥' : vmMode === 'mobile' ? '📱' : '🔄';
-      b.title = 'View: ' + vmMode + ' - tap: switch · long-press: Auto · drag: move';
+      b.title = 'View: ' + vmMode + ' - tap: switch, long-press: Auto, drag: move';
       b.setAttribute('style', BUTTON_CSS + ';background:rgba(0,0,0,.55);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:0.55;left:10px;bottom:10px');
       b.addEventListener('mouseenter', () => { b.style.opacity = '1'; });
       b.addEventListener('mouseleave', () => { b.style.opacity = '0.55'; });
@@ -854,7 +854,7 @@
       const b = document.createElement('button');
       b.id = 'fcf-toggle';
       b.textContent = '🧹';
-      b.title = 'Facebook Clean Feed - tap: toggle · drag: move';
+      b.title = 'Facebook Clean Feed - tap: toggle, drag: move';
       makeDraggable(b, 'fcf_pos', () => setFacebookEnabled(!settings.facebook.enabled));
       document.body.appendChild(b);
       if (!settings.facebook.enabled) b.style.opacity = '0.4';
@@ -862,7 +862,7 @@
 
     // Ad tracking is keyed on the centered <video> element (node identity), NOT the URL
     // path. Facebook gates its Reels ads and snap-scrolls back to them, and the path does
-    // not reliably change per reel — so keying on the path meant one nudge got reverted and
+    // not reliably change per reel - so keying on the path meant one nudge got reverted and
     // the ad was then marked "handled" forever. Keying on the element lets us keep retrying a
     // snapped-back ad and reset cleanly only once we actually land on a different reel.
     const _reelState = new WeakMap();
@@ -1106,7 +1106,7 @@
       const b = document.createElement('button');
       b.id = 'yt-toggle';
       b.textContent = '⏭';
-      b.title = 'YouTube Skip Ads - tap: toggle · drag: move';
+      b.title = 'YouTube Skip Ads - tap: toggle, drag: move';
       makeDraggable(b, 'yt_pos', () => setYoutubeEnabled(!settings.youtube.enabled));
       document.body.appendChild(b);
       if (!settings.youtube.enabled) b.style.opacity = '0.4';
