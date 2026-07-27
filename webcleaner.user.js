@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      6.0.0
+// @version      6.1.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -57,7 +57,7 @@
     },
   };
 
-  // ── storage (GM + localStorage dual-write) ─────────────────
+  // ── storage ────────────────────────────────────────────────
   const PFX = "wc6_";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
 
@@ -118,14 +118,6 @@
     }
   }
 
-  function inject(fn, payload) {
-    try {
-      const s = document.createElement("script");
-      s.textContent = "(" + fn + ")(" + JSON.stringify(payload).replace(/<\//g, "<\\/") + ");";
-      (document.head || document.documentElement).appendChild(s); s.remove();
-    } catch (_) {}
-  }
-
   function onHotkey(gs, h) {
     window.addEventListener("keydown", (e) => {
       if (e.metaKey) return;
@@ -138,11 +130,92 @@
   }
 
   function interceptNav(cb) {
-    const wrap = (fn) => function (...a) { let r; try { r = fn.apply(this, a); } catch (e) { throw e; } try { cb(); } catch (_) {} return r; };
-    try { history.pushState = wrap(history.pushState); } catch (_) {}
+    const wrap = (fn) => function (...a) {
+      let r; try { r = fn.apply(this, a); } catch (e) { throw e; }
+      try { cb(); } catch (_) {} return r;
+    };
+    try { history.pushState    = wrap(history.pushState); }    catch (_) {}
     try { history.replaceState = wrap(history.replaceState); } catch (_) {}
     window.addEventListener("popstate", () => { try { cb(); } catch (_) {} });
   }
+
+  // ── view mode: spoof runs directly in userscript context ───
+  // Userscripts run at document-start with access to the page's window object.
+  // We do NOT inject a <script> tag (which triggers CSP errors on YouTube/etc.).
+  // Object.defineProperty from the userscript sandbox affects the page's globals.
+  function defProp(obj, key, getter) {
+    try { Object.defineProperty(obj, key, { configurable: true, get: getter }); } catch (_) {}
+  }
+
+  function applyVMSpoof() {
+    const v = C.viewMode;
+    const storedVM = (() => { try { return localStorage.getItem(PFX + "vm") || ""; } catch (_) { return ""; } })();
+    const mode = storedVM || v.newSiteDefault;
+    if (mode === "auto") return;
+    const tm = mode === "mobile";
+
+    if (v.spoofUA) {
+      const ua = tm ? v.mobileUA : v.desktopUA;
+      defProp(navigator, "userAgent",  () => ua);
+      defProp(navigator, "appVersion", () => ua.replace(/^Mozilla\//, ""));
+      defProp(navigator, "platform",   () => tm ? "Linux armv8l" : "Win32");
+      defProp(navigator, "vendor",     () => "Google Inc.");
+      try {
+        const br = navigator.userAgentData?.brands ?? [];
+        defProp(navigator, "userAgentData", () => ({
+          mobile: tm, platform: tm ? "Android" : "Windows", brands: br,
+          getHighEntropyValues: () => Promise.resolve({ mobile: tm, platform: tm ? "Android" : "Windows" }),
+          toJSON: () => ({ mobile: tm, platform: tm ? "Android" : "Windows", brands: br }),
+        }));
+      } catch (_) {}
+    }
+
+    if (v.spoofTouch) {
+      defProp(navigator, "maxTouchPoints", () => tm ? 5 : 0);
+      try { if (tm && !("ontouchstart" in window)) window.ontouchstart = null; } catch (_) {}
+    }
+
+    if (v.spoofMedia) {
+      const emuW = tm ? v.mobileWidth : v.desktopWidth;
+      const nat  = window.matchMedia?.bind(window) ?? null;
+      window.matchMedia = (query) => {
+        const s = String(query).toLowerCase(); let r = null;
+        const f = (val) => { if (r !== false) r = val; }; let m;
+        if ((m = s.match(/min-width:\s*([\d.]+)px/))) f(emuW >= parseFloat(m[1]));
+        if ((m = s.match(/max-width:\s*([\d.]+)px/))) f(emuW <= parseFloat(m[1]));
+        if (s.includes("pointer: coarse") || s.includes("any-pointer: coarse")) f(tm);
+        if (s.includes("pointer: fine")   || s.includes("any-pointer: fine"))   f(!tm);
+        if (s.includes("hover: none"))  f(tm);
+        if (s.includes("hover: hover")) f(!tm);
+        if (r === null && nat) return nat(query);
+        return {
+          matches: !!r, media: String(query), onchange: null,
+          addEventListener() {}, removeEventListener() {},
+          addListener() {}, removeListener() {}, dispatchEvent() { return false; },
+        };
+      };
+
+      const uad = navigator.userAgentData;
+      const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent) ||
+        /iPad/.test(navigator.userAgent) ||
+        (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ||
+        (uad?.mobile === true);
+      const useFrame = tm && !realMobile && v.frameOnDesktop;
+
+      if (useFrame) {
+        defProp(window, "innerWidth",       () => v.mobileWidth);
+        defProp(window, "innerHeight",      () => v.mobileHeight);
+        defProp(screen, "width",            () => v.mobileWidth);
+        defProp(screen, "height",           () => v.mobileHeight);
+        defProp(screen, "availWidth",       () => v.mobileWidth);
+        defProp(screen, "availHeight",      () => v.mobileHeight);
+        defProp(window, "devicePixelRatio", () => v.mobileDpr);
+      }
+    }
+  }
+
+  // Run spoof immediately at document-start before any page JS runs
+  applyVMSpoof();
 
   // ── blocker helpers ────────────────────────────────────────
   const sbMatch   = (list) => { const h = bare(); return list.some((d) => h === d || h.endsWith("." + d)); };
@@ -153,15 +226,15 @@
     const { scheduleOn, schedule: sc } = C.siteBlocker;
     if (!scheduleOn || !sc.days.includes(new Date().getDay())) return false;
     const now = new Date(), cur = now.getHours() * 60 + now.getMinutes();
-    const [fh, fm] = sc.from.split(":").map(Number), [th, tm] = sc.to.split(":").map(Number);
-    const from = fh * 60 + fm, to = th * 60 + tm;
+    const [fh, fm] = sc.from.split(":").map(Number), [th, tm2] = sc.to.split(":").map(Number);
+    const from = fh * 60 + fm, to = th * 60 + tm2;
     return from <= to ? cur >= from && cur < to : cur >= from || cur < to;
   }
 
   function blockReason() {
     const s = C.siteBlocker;
     if (!s.enabled || sbSnoozed()) return null;
-    if (sbMatch(s.allow)) return null;
+    if (sbMatch(s.allow))  return null;
     if (sbMatch(s.custom)) return "on your block list";
     if (s.blockAdult && (sbMatch(ADULT) || ADULT_RE.test(bare()))) return "blocked by adult filter";
     if ((s.blockFocus || sbInSchedule()) && sbMatch(FOCUS)) return s.blockFocus ? "blocked by focus filter" : "blocked during focus hours";
@@ -174,204 +247,68 @@
     (affects === "block" ? before !== !!blockReason() : !!affects) ? location.reload() : Panel.refresh();
   }
 
-  // ── view mode state ────────────────────────────────────────
-  const vmStored = (() => { try { return localStorage.getItem(PFX + "vm") || ""; } catch (_) { return ""; } })();
-  const vmMode   = vmStored || C.viewMode.newSiteDefault;
+  // ── view mode ──────────────────────────────────────────────
+  const vmMode   = (() => { try { return localStorage.getItem(PFX + "vm") || ""; } catch (_) { return ""; } })() || C.viewMode.newSiteDefault;
   const vmActive = () => vmMode !== "auto";
   const setVM    = (m) => { try { localStorage.setItem(PFX + "vm", m); } catch (_) {} location.reload(); };
 
-  // ── button cluster ─────────────────────────────────────────
-  // All floating buttons live in one draggable container anchored together.
-  // Drag moves the whole cluster. Tap individual icons for their actions.
-  const CLUSTER_CSS = `
-    position:fixed;z-index:2147483647;display:flex;flex-direction:column;gap:6px;
-    touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
-  `.replace(/\n\s*/g, "");
-  const CBTN = `
-    width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;font-size:18px;
-    line-height:42px;padding:0;text-align:center;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 2px 10px rgba(0,0,0,.4);transition:transform .1s,opacity .2s;-webkit-appearance:none;
-  `.replace(/\n\s*/g, "");
+  function initVM() {
+    const v = C.viewMode;
+    const toMobile = vmMode === "mobile";
+    const uad = navigator.userAgentData;
+    const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent) ||
+      /iPad/.test(navigator.userAgent) ||
+      (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ||
+      (uad?.mobile === true);
+    const useFrame = toMobile && !realMobile && v.frameOnDesktop;
 
-  function initCluster() {
-    if (!document.body || document.getElementById("wc-cl")) return;
-    const cl = mk("div", { id: "wc-cl", style: CLUSTER_CSS });
-
-    const saved = (() => { try { return JSON.parse(localStorage.getItem(PFX + "clpos") || "null"); } catch (_) { return null; } })();
-    if (saved?.l != null) {
-      cl.style.left = clamp(saved.l, 0, innerWidth - 48) + "px";
-      cl.style.top  = clamp(saved.t, 0, innerHeight - 120) + "px";
-      cl.style.right = cl.style.bottom = "auto";
-    } else {
-      cl.style.right = "10px";
-      cl.style.bottom = `calc(24px + env(safe-area-inset-bottom))`;
+    // Viewport meta management
+    let vpLocked = false;
+    function applyVP() {
+      if (vmMode === "auto" || vpLocked) return; vpLocked = true;
+      qa('meta[name="viewport"]').forEach((e) => { if (!e.hasAttribute("data-wc")) e.remove(); });
+      let m = q('meta[name="viewport"][data-wc]');
+      if (!m) { m = mk("meta", { name: "viewport", "data-wc": "1" }); (document.head || document.documentElement).appendChild(m); }
+      m.setAttribute("content", vmMode === "desktop"
+        ? `width=${v.desktopWidth}`
+        : "width=device-width,initial-scale=1,viewport-fit=cover");
+      vpLocked = false;
     }
 
-    const addBtn = (icon, bg, opacity, ariaLabel) => {
-      const b = mk("button", { style: `${CBTN}background:${bg};color:#fff;opacity:${opacity}`, "aria-label": ariaLabel }, icon);
-      cl.appendChild(b);
-      return b;
-    };
-
-    // panel button — always present
-    const fabBtn = addBtn("🧼", "#1c1c2e", ".8", "Settings");
-    fabBtn.onclick = () => { if (!dragged) Panel.open(); };
-
-    // view mode button
-    if (C.viewMode.showButton) {
-      const vmIcon = vmMode === "desktop" ? "🖥" : vmMode === "mobile" ? "📱" : "🔄";
-      const vmBtn = addBtn(vmIcon, "rgba(20,20,34,.8)", ".7", "View mode");
-      let vmLong = null;
-      vmBtn.addEventListener("pointerdown", () => {
-        vmLong = setTimeout(() => { vmLong = null; setVM("auto"); }, C.viewMode.longPressMs);
-      });
-      vmBtn.addEventListener("pointerup", () => {
-        if (vmLong) { clearTimeout(vmLong); vmLong = null; if (!dragged) setVM(vmMode === "desktop" ? "mobile" : "desktop"); }
-      });
-      vmBtn.addEventListener("mouseenter", () => { vmBtn.style.opacity = "1"; });
-      vmBtn.addEventListener("mouseleave", () => { vmBtn.style.opacity = ".7"; });
+    function applyFrame() {
+      if (!useFrame) return;
+      addStyle("vm-frame",
+        `html.vm-f{background:#202124!important;overflow-x:hidden!important}` +
+        `html.vm-f>body{width:${v.mobileWidth}px!important;min-width:${v.mobileWidth}px!important;` +
+        `max-width:${v.mobileWidth}px!important;margin:0 auto!important;min-height:100vh!important;` +
+        `overflow-x:hidden!important;box-shadow:0 0 0 100vmax #202124,0 0 40px rgba(0,0,0,.6)!important}`);
+      document.documentElement.classList.add("vm-f");
     }
 
-    // facebook button
-    if (isFB && C.facebook.showToggleButton) {
-      const fbBtn = addBtn("🧹", "#fff", C.facebook.enabled ? "1" : ".3", "Facebook cleaner");
-      fbBtn.style.color = "#111";
-      fbBtn.id = "fcf-btn";
-      fbBtn.onclick = () => { if (!dragged) toggleFB(!C.facebook.enabled); };
+    applyVP();
+    if (vmMode !== "auto") {
+      new MutationObserver(() => { if (!vpLocked) applyVP(); })
+        .observe(document.head || document.documentElement, { childList: true, subtree: true });
+      document.addEventListener("DOMContentLoaded", () => { applyVP(); applyFrame(); });
+      [200, 600, 1500, 3500].forEach((t) => setTimeout(() => { applyVP(); applyFrame(); }, t));
     }
-
-    // youtube button
-    if (isYT && C.youtube.showToggleButton) {
-      const ytBtn = addBtn("⏭", "#fff", C.youtube.enabled ? "1" : ".3", "YouTube ad skip");
-      ytBtn.style.color = "#111";
-      ytBtn.id = "yt-btn";
-      ytBtn.onclick = () => { if (!dragged) toggleYT(!C.youtube.enabled); };
-    }
-
-    // drag the whole cluster
-    let pr = null, dragged = false;
-    cl.addEventListener("pointerdown", (e) => {
-      if (e.target !== cl && e.target.tagName === "BUTTON") {
-        // let button handle its own click, but also start drag tracking
-      }
-      e.preventDefault();
-      try { cl.setPointerCapture(e.pointerId); } catch (_) {}
-      dragged = false;
-      pr = { sx: e.clientX, sy: e.clientY };
-    });
-    cl.addEventListener("pointermove", (e) => {
-      if (!pr) return;
-      if (!dragged && Math.hypot(e.clientX - pr.sx, e.clientY - pr.sy) > 8) dragged = true;
-      if (dragged) {
-        cl.style.left = clamp(e.clientX - 22, 0, innerWidth - 48) + "px";
-        cl.style.top  = clamp(e.clientY - 22, 0, innerHeight - 60) + "px";
-        cl.style.right = cl.style.bottom = "auto";
-      }
-    });
-    cl.addEventListener("pointerup", (e) => {
-      try { cl.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (dragged) {
-        try { localStorage.setItem(PFX + "clpos", JSON.stringify({ l: parseInt(cl.style.left), t: parseInt(cl.style.top) })); } catch (_) {}
-      }
-      pr = null;
-    });
-    cl.addEventListener("pointercancel", () => { pr = null; dragged = false; });
-
-    document.body.appendChild(cl);
+    onHotkey(() => v.toggleHotkey, () => setVM(vmMode === "desktop" ? "mobile" : "desktop"));
   }
 
-  // ── panel CSS ──────────────────────────────────────────────
-  const keyLabel = (h) => (h.ctrl ? "Ctrl+" : "") + (h.alt ? "Alt+" : "") + (h.shift ? "Shift+" : "") + String(h.key || "").toUpperCase();
-  const PCSS = `
-    :host{all:initial}
-    *{box-sizing:border-box;font-family:-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-    .bk{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2147483646;-webkit-tap-highlight-color:transparent}
-    .cd{position:fixed;inset:0;margin:auto;width:min(480px,calc(100vw - 16px));height:fit-content;max-height:min(92dvh,880px);
-        overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
-        background:#17181b;color:#e9e9ea;border-radius:20px;padding:16px 14px;
-        box-shadow:0 20px 60px rgba(0,0,0,.8);z-index:2147483647;font-size:14px;line-height:1.4}
-    .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-    .hd h1{font-size:17px;font-weight:700;margin:0}
-    .x{background:#2b2b30;border:0;color:#e9e9ea;font-size:16px;cursor:pointer;
-       width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-       flex:0 0 auto;-webkit-appearance:none}
-    .r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #26272c;min-height:44px}
-    .r>span{flex:1;line-height:1.25;font-size:13px}
-    .r2{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #26272c;min-height:44px;flex-wrap:wrap}
-    .r2>span{font-size:13px;flex:0 0 auto}
-    .fr{display:flex;flex-direction:column;gap:5px;padding:8px 0;border-top:1px solid #26272c}
-    .cu{font-size:11px;color:#8a8a90;margin-top:2px}
-    .snz{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-    .gr{display:grid;grid-template-columns:1fr 1fr;gap:0}
-    .gr .r{border-right:1px solid #26272c;padding-right:6px}
-    .gr .r:nth-child(2n){border-right:0;padding-left:6px;padding-right:0}
-    .sc{margin-top:10px}
-    .sc>h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7a7a80;margin:0 0 2px}
-    .it{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid #26272c;min-height:40px}
-    .it span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px}
-    .dl{background:none;border:0;color:#ff6b6b;cursor:pointer;padding:0;width:30px;height:30px;font-size:16px;
-        display:flex;align-items:center;justify-content:center;flex:0 0 auto;-webkit-appearance:none;border-radius:50%}
-    .dl:active{background:#2b2b30}
-    .ad{display:flex;gap:6px;margin-top:6px}
-    .ad input{flex:1;min-width:0;background:#0e0f11;border:1.5px solid #303138;color:#e9e9ea;
-              border-radius:12px;padding:10px 12px;font-size:14px;-webkit-appearance:none;min-height:44px}
-    .ad input:focus{border-color:#3a7afe;outline:none}
-    .ad button{background:#3a7afe;border:0;color:#fff;border-radius:12px;cursor:pointer;
-               padding:0 16px;font-size:14px;flex:0 0 auto;-webkit-appearance:none;min-height:44px;font-weight:600}
-    .em{color:#6a6a70;font-style:italic;padding:6px 0;border-top:1px solid #26272c;font-size:13px}
-    .sw{position:relative;display:inline-block;width:46px;height:28px;flex:0 0 auto}
-    .sw input{opacity:0;width:0;height:0;position:absolute}
-    .tk{position:absolute;inset:0;background:#3a3b42;border-radius:999px;transition:.2s;cursor:pointer}
-    .tk::before{content:"";position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;
-                border-radius:50%;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
-    .sw input:checked+.tk{background:#34c759}
-    .sw input:checked+.tk::before{transform:translateX(18px)}
-    details{margin-top:4px}
-    summary{cursor:pointer;padding:8px 0;color:#b0b0b6;border-top:1px solid #26272c;
-            list-style:none;user-select:none;font-weight:600;font-size:13px;min-height:40px;
-            display:flex;align-items:center;gap:4px}
-    summary::-webkit-details-marker{display:none}
-    details[open]>summary::after{content:"▲";font-size:8px;color:#6a6a70;margin-left:auto}
-    details:not([open])>summary::after{content:"▼";font-size:8px;color:#6a6a70;margin-left:auto}
-    .pl{border:0;border-radius:8px;cursor:pointer;padding:4px 10px;font-size:11px;
-        flex:0 0 auto;-webkit-appearance:none;min-height:30px;font-weight:500}
-    .bl{background:#3a2b2b;color:#ff9a9a}.al{background:#1e3020;color:#7ee89a}
-    .pg{display:flex;flex-wrap:wrap;gap:4px;padding:6px 0}
-    .nm{width:80px;background:#0e0f11;border:1px solid #303138;color:#e9e9ea;
-        border-radius:8px;padding:6px 8px;font-size:13px;text-align:right;-webkit-appearance:none;min-height:36px}
-    .tm{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;
-        padding:6px 8px;font-size:13px;-webkit-appearance:none;min-height:36px;width:100px}
-    .tx{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;
-        padding:8px 10px;font-size:12px;width:100%;-webkit-appearance:none;min-height:36px}
-    .nm:focus,.tm:focus,.tx:focus{border-color:#3a7afe;outline:none}
-    .hk{background:#2b2b30;border:0;color:#e9e9ea;border-radius:8px;cursor:pointer;
-        padding:6px 12px;font-size:12px;-webkit-appearance:none;min-height:36px}
-    .hk.arm{background:#3a7afe;color:#fff}
-    .sg{display:flex;gap:4px;flex:0 0 auto}
-    .sg button{flex:1;background:#2b2b30;border:0;color:#c9c9cf;border-radius:8px;cursor:pointer;
-               padding:6px 8px;font-size:12px;-webkit-appearance:none;min-height:36px;white-space:nowrap}
-    .sg button.on{background:#3a7afe;color:#fff;font-weight:600}
-  `.replace(/\n\s+/g, " ").trim();
-
   // ── panel HTML helpers ─────────────────────────────────────
+  const keyLabel = (h) => (h.ctrl ? "Ctrl+" : "") + (h.alt ? "Alt+" : "") + (h.shift ? "Shift+" : "") + String(h.key || "").toUpperCase();
+
   const sw = (label, mod, key) =>
     `<div class="r"><span>${esc(label)}</span><label class="sw"><input type="checkbox" data-sw="${mod}.${key}"${C[mod][key] ? " checked" : ""}><span class="tk"></span></label></div>`;
-
-  // two switches in one row
   const sw2 = (l1, m1, k1, l2, m2, k2) =>
     `<div class="r2"><span>${esc(l1)}</span><label class="sw"><input type="checkbox" data-sw="${m1}.${k1}"${C[m1][k1] ? " checked" : ""}><span class="tk"></span></label>` +
     `<span style="margin-left:auto">${esc(l2)}</span><label class="sw"><input type="checkbox" data-sw="${m2}.${k2}"${C[m2][k2] ? " checked" : ""}><span class="tk"></span></label></div>`;
-
-  // two numbers in one row
   const num2 = (l1, m1, k1, l2, m2, k2) =>
     `<div class="r2"><span>${esc(l1)}</span><input class="nm" type="number" inputmode="decimal" data-num="${m1}.${k1}" value="${esc(C[m1][k1])}">` +
     `<span style="margin-left:auto">${esc(l2)}</span><input class="nm" type="number" inputmode="decimal" data-num="${m2}.${k2}" value="${esc(C[m2][k2])}"></div>`;
-
-  // two times in one row
   const time2 = (l1, m, k1, l2, k2) =>
     `<div class="r2"><span>${esc(l1)}</span><input class="tm" type="time" data-time="${m}.${k1}" value="${esc(C[m].schedule[k1])}">` +
     `<span style="margin-left:auto">${esc(l2)}</span><input class="tm" type="time" data-time="${m}.${k2}" value="${esc(C[m].schedule[k2])}"></div>`;
-
   const numRow = (l, m, k) =>
     `<div class="r"><span>${esc(l)}</span><input class="nm" type="number" inputmode="decimal" data-num="${m}.${k}" value="${esc(C[m][k])}"></div>`;
   const txtRow = (l, m, k) =>
@@ -379,13 +316,11 @@
   const hkRow  = (m) =>
     `<div class="r"><span>Shortcut</span><button class="hk" data-hk="${m}">${esc(keyLabel(C[m].toggleHotkey))}</button></div>`;
 
-  // grid of switches (2 columns)
   const swGrid = (mod, pairs) => {
-    let html = '<div class="gr">';
-    for (const [l, k] of pairs)
-      html += `<div class="r"><span>${esc(l)}</span><label class="sw"><input type="checkbox" data-sw="${mod}.${k}"${C[mod][k] ? " checked" : ""}><span class="tk"></span></label></div>`;
-    html += '</div>';
-    return html;
+    const rows = pairs.map(([l, k]) =>
+      `<div class="r"><span>${esc(l)}</span><label class="sw"><input type="checkbox" data-sw="${mod}.${k}"${C[mod][k] ? " checked" : ""}><span class="tk"></span></label></div>`
+    ).join("");
+    return `<div class="gr">${rows}</div>`;
   };
 
   function listBlock(label, mod, key, ph) {
@@ -428,7 +363,7 @@
 
   const secVM = () => {
     const v = C.viewMode, modes = ["desktop","mobile","auto"];
-    const seg = (val, attr) => `<button class="${(attr === "data-vm" ? vmMode : v.newSiteDefault) === val ? "on" : ""}" ${attr}="${val}">${val[0].toUpperCase()+val.slice(1)}</button>`;
+    const seg = (val, attr) => `<button class="${(attr === "data-vm" ? vmMode : v.newSiteDefault) === val ? "on" : ""}" ${attr}="${val}">${val[0].toUpperCase() + val.slice(1)}</button>`;
     return `<details data-s=vm>
       <summary>🖥 View ${vmMode.toUpperCase()}</summary>
       <div class="r2"><span>Site</span><div class="sg">${modes.map((m) => seg(m,"data-vm")).join("")}</div>
@@ -438,8 +373,7 @@
         ${num2("Desktop W","viewMode","desktopWidth","Mobile W","viewMode","mobileWidth")}
         ${num2("Mobile H","viewMode","mobileHeight","DPR","viewMode","mobileDpr")}
         ${numRow("Long-press ms","viewMode","longPressMs")}
-        ${txtRow("Mobile UA","viewMode","mobileUA")}
-        ${txtRow("Desktop UA","viewMode","desktopUA")}
+        ${txtRow("Mobile UA","viewMode","mobileUA")}${txtRow("Desktop UA","viewMode","desktopUA")}
         ${hkRow("viewMode")}
       </details>
     </details>`;
@@ -467,6 +401,64 @@
     ])}
     <details data-s=yt-adv><summary>Advanced</summary>${hkRow("youtube")}</details>
   </details>`;
+
+  // ── panel CSS ──────────────────────────────────────────────
+  const PCSS = `
+    :host{all:initial}
+    *{box-sizing:border-box;font-family:-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+    .bk{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2147483646;-webkit-tap-highlight-color:transparent}
+    .cd{position:fixed;inset:0;margin:auto;width:min(480px,calc(100vw - 16px));height:fit-content;max-height:min(92dvh,880px);
+        overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+        background:#17181b;color:#e9e9ea;border-radius:20px;padding:16px 14px;
+        box-shadow:0 20px 60px rgba(0,0,0,.8);z-index:2147483647;font-size:14px;line-height:1.4}
+    .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .hd h1{font-size:17px;font-weight:700;margin:0}
+    .x{background:#2b2b30;border:0;color:#e9e9ea;font-size:16px;cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 auto;-webkit-appearance:none}
+    .r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid #26272c;min-height:44px}
+    .r>span{flex:1;line-height:1.25;font-size:13px}
+    .r2{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #26272c;min-height:44px;flex-wrap:wrap}
+    .r2>span{font-size:13px;flex:0 0 auto}
+    .fr{display:flex;flex-direction:column;gap:5px;padding:8px 0;border-top:1px solid #26272c}
+    .cu{font-size:11px;color:#8a8a90;margin-top:2px}
+    .snz{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+    .gr{display:grid;grid-template-columns:1fr 1fr;gap:0}
+    .gr .r{border-right:1px solid #26272c;padding-right:6px}
+    .gr .r:nth-child(2n){border-right:0;padding-left:6px;padding-right:0}
+    .sc{margin-top:10px}
+    .sc>h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#7a7a80;margin:0 0 2px}
+    .it{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid #26272c;min-height:40px}
+    .it span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px}
+    .dl{background:none;border:0;color:#ff6b6b;cursor:pointer;padding:0;width:30px;height:30px;font-size:16px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;-webkit-appearance:none;border-radius:50%}
+    .dl:active{background:#2b2b30}
+    .ad{display:flex;gap:6px;margin-top:6px}
+    .ad input{flex:1;min-width:0;background:#0e0f11;border:1.5px solid #303138;color:#e9e9ea;border-radius:12px;padding:10px 12px;font-size:14px;-webkit-appearance:none;min-height:44px}
+    .ad input:focus{border-color:#3a7afe;outline:none}
+    .ad button{background:#3a7afe;border:0;color:#fff;border-radius:12px;cursor:pointer;padding:0 16px;font-size:16px;flex:0 0 auto;-webkit-appearance:none;min-height:44px;font-weight:700}
+    .em{color:#6a6a70;font-style:italic;padding:6px 0;border-top:1px solid #26272c;font-size:13px}
+    .sw{position:relative;display:inline-block;width:46px;height:28px;flex:0 0 auto}
+    .sw input{opacity:0;width:0;height:0;position:absolute}
+    .tk{position:absolute;inset:0;background:#3a3b42;border-radius:999px;transition:.2s;cursor:pointer}
+    .tk::before{content:"";position:absolute;width:24px;height:24px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+    .sw input:checked+.tk{background:#34c759}
+    .sw input:checked+.tk::before{transform:translateX(18px)}
+    details{margin-top:4px}
+    summary{cursor:pointer;padding:8px 0;color:#b0b0b6;border-top:1px solid #26272c;list-style:none;user-select:none;font-weight:600;font-size:13px;min-height:40px;display:flex;align-items:center;gap:4px}
+    summary::-webkit-details-marker{display:none}
+    details[open]>summary::after{content:"▲";font-size:8px;color:#6a6a70;margin-left:auto}
+    details:not([open])>summary::after{content:"▼";font-size:8px;color:#6a6a70;margin-left:auto}
+    .pl{border:0;border-radius:8px;cursor:pointer;padding:4px 10px;font-size:11px;flex:0 0 auto;-webkit-appearance:none;min-height:30px;font-weight:500}
+    .bl{background:#3a2b2b;color:#ff9a9a}.al{background:#1e3020;color:#7ee89a}
+    .pg{display:flex;flex-wrap:wrap;gap:4px;padding:6px 0}
+    .nm{width:80px;background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:6px 8px;font-size:13px;text-align:right;-webkit-appearance:none;min-height:36px}
+    .tm{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:6px 8px;font-size:13px;-webkit-appearance:none;min-height:36px;width:100px}
+    .tx{background:#0e0f11;border:1px solid #303138;color:#e9e9ea;border-radius:8px;padding:8px 10px;font-size:12px;width:100%;-webkit-appearance:none;min-height:36px}
+    .nm:focus,.tm:focus,.tx:focus{border-color:#3a7afe;outline:none}
+    .hk{background:#2b2b30;border:0;color:#e9e9ea;border-radius:8px;cursor:pointer;padding:6px 12px;font-size:12px;-webkit-appearance:none;min-height:36px}
+    .hk.arm{background:#3a7afe;color:#fff}
+    .sg{display:flex;gap:4px;flex:0 0 auto}
+    .sg button{flex:1;background:#2b2b30;border:0;color:#c9c9cf;border-radius:8px;cursor:pointer;padding:6px 8px;font-size:12px;-webkit-appearance:none;min-height:36px;white-space:nowrap}
+    .sg button.on{background:#3a7afe;color:#fff;font-weight:600}
+  `.replace(/\n\s+/g, " ").trim();
 
   // ── panel ──────────────────────────────────────────────────
   const Panel = (() => {
@@ -521,8 +513,7 @@
 
       qa("[data-dl]", sh).forEach((e) => e.addEventListener("click", () => {
         const [m, k] = e.getAttribute("data-dl").split(".");
-        const v = e.getAttribute("data-v");
-        edit(m, () => { C[m][k] = C[m][k].filter((d) => d !== v); });
+        edit(m, () => { C[m][k] = C[m][k].filter((d) => d !== e.getAttribute("data-v")); });
       }));
 
       qa("[data-ab]", sh).forEach((btn) => {
@@ -541,7 +532,7 @@
         };
         btn.addEventListener("click", go);
         inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(); } });
-        inp.addEventListener("keyup", (e) => { if (e.key === "Enter") go(); });
+        inp.addEventListener("keyup",   (e) => { if (e.key === "Enter") go(); });
       });
 
       qa("[data-pk]", sh).forEach((b) => b.addEventListener("click", () => {
@@ -585,83 +576,153 @@
     return { open, close, refresh: () => { if (root?.shadowRoot) render(); } };
   })();
 
+  // ── button cluster ─────────────────────────────────────────
+  const CBTN = `width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;font-size:18px;line-height:42px;padding:0;text-align:center;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.4);transition:transform .1s,opacity .2s;-webkit-appearance:none;`;
+
+  function initCluster() {
+    if (!document.body || document.getElementById("wc-cl")) return;
+    const cl = mk("div", {
+      id: "wc-cl",
+      style: "position:fixed;z-index:2147483647;display:flex;flex-direction:column;gap:6px;" +
+        "touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;" +
+        "padding:4px;border-radius:28px;background:rgba(0,0,0,.15)"
+    });
+
+    const saved = (() => {
+      try { return JSON.parse(localStorage.getItem(PFX + "clpos") || "null"); }
+      catch (_) { return null; }
+    })();
+
+    if (saved?.l != null) {
+      cl.style.left   = clamp(saved.l, 0, innerWidth  - 52) + "px";
+      cl.style.top    = clamp(saved.t, 0, innerHeight - 200) + "px";
+      cl.style.right  = cl.style.bottom = "auto";
+    } else {
+      cl.style.right  = "8px";
+      cl.style.bottom = `calc(24px + env(safe-area-inset-bottom))`;
+    }
+
+    const addBtn = (icon, bg, color, opacity, id) => {
+      const b = mk("button", {
+        style: `${CBTN}background:${bg};color:${color};opacity:${opacity}`,
+        "aria-label": icon
+      }, icon);
+      if (id) b.id = id;
+      cl.appendChild(b);
+      return b;
+    };
+
+    // State: track drag vs tap
+    let startX = 0, startY = 0, isDragging = false, pointerId = null;
+
+    // ── drag: only activates after 8px movement ──
+    cl.addEventListener("pointerdown", (e) => {
+      startX = e.clientX;
+      startY = e.clientY;
+      isDragging = false;
+      pointerId = e.pointerId;
+      // Do NOT preventDefault here — let button clicks pass through
+      // Do NOT setPointerCapture here — only capture once drag confirmed
+    });
+
+    cl.addEventListener("pointermove", (e) => {
+      if (pointerId === null) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!isDragging && Math.hypot(dx, dy) > 8) {
+        isDragging = true;
+        // NOW capture the pointer and prevent button clicks
+        try { cl.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+      if (isDragging) {
+        e.preventDefault();
+        cl.style.left   = clamp(e.clientX - 26, 0, innerWidth  - 52) + "px";
+        cl.style.top    = clamp(e.clientY - 26, 0, innerHeight - 60) + "px";
+        cl.style.right  = cl.style.bottom = "auto";
+      }
+    });
+
+    cl.addEventListener("pointerup", (e) => {
+      if (isDragging) {
+        try { cl.releasePointerCapture(e.pointerId); } catch (_) {}
+        try {
+          localStorage.setItem(PFX + "clpos", JSON.stringify({
+            l: parseInt(cl.style.left),
+            t: parseInt(cl.style.top)
+          }));
+        } catch (_) {}
+      }
+      pointerId = null;
+      isDragging = false;
+    });
+
+    cl.addEventListener("pointercancel", () => { pointerId = null; isDragging = false; });
+
+    // ── buttons: normal click handlers, check isDragging ──
+
+    // 🧼 Settings — always present
+    addBtn("🧼", "#1c1c2e", "#fff", ".85", "")
+      .addEventListener("click", () => { if (!isDragging) Panel.open(); });
+
+    // 🖥/📱 View mode
+    if (C.viewMode.showButton) {
+      const icon = vmMode === "desktop" ? "🖥" : vmMode === "mobile" ? "📱" : "🔄";
+      const vmBtn = addBtn(icon, "rgba(20,20,34,.85)", "#fff", ".75", "");
+      let longTimer = null;
+
+      vmBtn.addEventListener("pointerdown", (e) => {
+        e.stopPropagation(); // don't trigger cluster drag
+        longTimer = setTimeout(() => {
+          longTimer = null;
+          setVM("auto");
+        }, C.viewMode.longPressMs);
+      });
+
+      vmBtn.addEventListener("pointerup", () => {
+        if (longTimer) {
+          clearTimeout(longTimer);
+          longTimer = null;
+          if (!isDragging) setVM(vmMode === "desktop" ? "mobile" : "desktop");
+        }
+      });
+
+      vmBtn.addEventListener("pointercancel", () => {
+        if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+      });
+
+      // prevent cluster drag when interacting with this button
+      vmBtn.addEventListener("pointermove", (e) => e.stopPropagation());
+    }
+
+    // 🧹 Facebook — only on FB
+    if (isFB && C.facebook.showToggleButton) {
+      addBtn("🧹", "#fff", "#111", C.facebook.enabled ? "1" : ".3", "fcf-btn")
+        .addEventListener("click", () => { if (!isDragging) toggleFB(!C.facebook.enabled); });
+    }
+
+    // ⏭ YouTube — only on YT
+    if (isYT && C.youtube.showToggleButton) {
+      addBtn("⏭", "#fff", "#111", C.youtube.enabled ? "1" : ".3", "yt-btn")
+        .addEventListener("click", () => { if (!isDragging) toggleYT(!C.youtube.enabled); });
+    }
+
+    document.body.appendChild(cl);
+  }
+
   // ── site blocker ───────────────────────────────────────────
   function initSB() {
     function showBlock(why) {
       try { window.stop(); } catch (_) {}
       document.documentElement.innerHTML = `<head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Blocked</title></head><body></body>`;
       const b = document.body; b.id = "wc-blk";
-      Object.assign(b.style, { margin:"0", minHeight:"100dvh", display:"flex", flexDirection:"column",
-        alignItems:"center", justifyContent:"center", gap:"16px", textAlign:"center",
-        padding:`32px 24px calc(32px + env(safe-area-inset-bottom)) 24px`,
-        fontFamily:"-apple-system,system-ui,sans-serif", background:"#0b0b0c", color:"#e9e9ea" });
+      Object.assign(b.style, { margin:"0", minHeight:"100dvh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"16px", textAlign:"center", padding:`32px 24px calc(32px + env(safe-area-inset-bottom)) 24px`, fontFamily:"-apple-system,system-ui,sans-serif", background:"#0b0b0c", color:"#e9e9ea" });
       const btn = (text, bg, fg="#e9e9ea") => mk("button", { style:`padding:14px 28px;border:0;border-radius:16px;cursor:pointer;font-size:17px;font-weight:600;min-height:52px;-webkit-appearance:none;background:${bg};color:${fg};width:min(280px,100%)` }, text);
-      const ab = btn(`Allow for ${C.siteBlocker.snoozeMinutes} min`, "#2b2b30");
-      ab.onclick = () => { sbSnooze(C.siteBlocker.snoozeMinutes); location.reload(); };
-      const mb = btn("⚙ Manage", "#1c1c22", "#9a9aa0"); mb.style.fontSize = "15px";
-      mb.onclick = Panel.open;
-      b.append(
-        mk("div", { style:"font-size:72px;line-height:1;margin-bottom:4px" }, "⛔"),
-        mk("div", { style:"font-size:26px;font-weight:700" }, "Blocked"),
-        mk("div", { style:"opacity:.6;max-width:26rem;line-height:1.6;font-size:16px" }, `${bare()} — ${why}.`),
-        ab, mb,
-      );
+      const ab = btn(`Allow for ${C.siteBlocker.snoozeMinutes} min`, "#2b2b30"); ab.onclick = () => { sbSnooze(C.siteBlocker.snoozeMinutes); location.reload(); };
+      const mb = btn("⚙ Manage", "#1c1c22", "#9a9aa0"); mb.style.fontSize = "15px"; mb.onclick = Panel.open;
+      b.append(mk("div",{style:"font-size:72px;line-height:1;margin-bottom:4px"},"⛔"), mk("div",{style:"font-size:26px;font-weight:700"},"Blocked"), mk("div",{style:"opacity:.6;max-width:26rem;line-height:1.6;font-size:16px"},`${bare()} — ${why}.`), ab, mb);
     }
     const check = () => { const w = blockReason(); if (w && !document.getElementById("wc-blk")) showBlock(w); };
     check(); setInterval(check, 5000);
     onHotkey(() => C.siteBlocker.toggleHotkey, () => applyEdit("siteBlocker", () => { C.siteBlocker.enabled = !C.siteBlocker.enabled; }, "block"));
-  }
-
-  // ── view mode spoof ────────────────────────────────────────
-  function vmSpoof(p) {
-    const def = (obj, k, get) => { try { Object.defineProperty(obj, k, { configurable:true, get }); } catch(_){} };
-    const { toMobile:tm, useFrame, cfg:c } = p;
-    if (c.spoofUA) {
-      const ua = tm ? c.mobileUA : c.desktopUA;
-      def(navigator, "userAgent", ()=>ua); def(navigator, "appVersion", ()=>ua.replace(/^Mozilla\//,"")); def(navigator, "platform", ()=>tm?"Linux armv8l":"Win32"); def(navigator, "vendor", ()=>"Google Inc.");
-      try { const br=navigator.userAgentData?.brands??[]; def(navigator,"userAgentData",()=>({mobile:tm,platform:tm?"Android":"Windows",brands:br,getHighEntropyValues:()=>Promise.resolve({mobile:tm,platform:tm?"Android":"Windows"}),toJSON:()=>({mobile:tm,platform:tm?"Android":"Windows",brands:br})})); } catch(_){}
-    }
-    if (c.spoofTouch) { def(navigator,"maxTouchPoints",()=>tm?5:0); try{if(tm&&!("ontouchstart" in window))window.ontouchstart=null}catch(_){} }
-    if (c.spoofMedia) {
-      const ew=tm?c.mobileWidth:c.desktopWidth, nat=window.matchMedia?.bind(window)??null;
-      window.matchMedia=(query)=>{const s=String(query).toLowerCase();let r=null;const f=(v)=>{if(r!==false)r=v};let m;
-        if((m=s.match(/min-width:\s*([\d.]+)px/)))f(ew>=parseFloat(m[1]));if((m=s.match(/max-width:\s*([\d.]+)px/)))f(ew<=parseFloat(m[1]));
-        if(s.includes("pointer: coarse")||s.includes("any-pointer: coarse"))f(tm);if(s.includes("pointer: fine")||s.includes("any-pointer: fine"))f(!tm);
-        if(s.includes("hover: none"))f(tm);if(s.includes("hover: hover"))f(!tm);
-        if(r===null&&nat)return nat(query);
-        return{matches:!!r,media:String(query),onchange:null,addEventListener(){},removeEventListener(){},addListener(){},removeListener(){},dispatchEvent(){return false}};};
-      if(useFrame){def(window,"innerWidth",()=>c.mobileWidth);def(window,"innerHeight",()=>c.mobileHeight);def(screen,"width",()=>c.mobileWidth);def(screen,"height",()=>c.mobileHeight);def(screen,"availWidth",()=>c.mobileWidth);def(screen,"availHeight",()=>c.mobileHeight);def(window,"devicePixelRatio",()=>c.mobileDpr);}
-    }
-  }
-
-  function initVM() {
-    const v = C.viewMode;
-    const realMobile = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent) || /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1) || (navigator.userAgentData?.mobile===true);
-    const toMobile = vmMode === "mobile", useFrame = toMobile && !realMobile && v.frameOnDesktop;
-
-    if (vmMode !== "auto") inject(vmSpoof, { toMobile, useFrame, cfg:{ spoofUA:v.spoofUA, spoofTouch:v.spoofTouch, spoofMedia:v.spoofMedia, mobileUA:v.mobileUA, desktopUA:v.desktopUA, mobileWidth:v.mobileWidth, desktopWidth:v.desktopWidth, mobileHeight:v.mobileHeight, mobileDpr:v.mobileDpr } });
-
-    let vpLocked = false;
-    function applyVP() {
-      if (vmMode === "auto" || vpLocked) return; vpLocked = true;
-      qa('meta[name="viewport"]').forEach((e) => { if (!e.hasAttribute("data-wc")) e.remove(); });
-      let m = q('meta[name="viewport"][data-wc]');
-      if (!m) { m = mk("meta", { name:"viewport", "data-wc":"1" }); (document.head||document.documentElement).appendChild(m); }
-      m.setAttribute("content", vmMode === "desktop" ? `width=${v.desktopWidth}` : "width=device-width,initial-scale=1,viewport-fit=cover");
-      vpLocked = false;
-    }
-    function applyFrame() {
-      if (!useFrame) return;
-      addStyle("vm-frame", `html.vm-f{background:#202124!important;overflow-x:hidden!important}html.vm-f>body{width:${v.mobileWidth}px!important;min-width:${v.mobileWidth}px!important;max-width:${v.mobileWidth}px!important;margin:0 auto!important;min-height:100vh!important;overflow-x:hidden!important;box-shadow:0 0 0 100vmax #202124,0 0 40px rgba(0,0,0,.6)!important}`);
-      document.documentElement.classList.add("vm-f");
-    }
-    applyVP();
-    if (vmMode !== "auto") {
-      new MutationObserver(() => { if (!vpLocked) applyVP(); }).observe(document.head||document.documentElement, { childList:true, subtree:true });
-      document.addEventListener("DOMContentLoaded", () => { applyVP(); applyFrame(); });
-      [200,600,1500,3500].forEach((t) => setTimeout(() => { applyVP(); applyFrame(); }, t));
-    }
-    onHotkey(() => v.toggleHotkey, () => setVM(vmMode === "desktop" ? "mobile" : "desktop"));
   }
 
   // ── facebook ───────────────────────────────────────────────
@@ -686,10 +747,10 @@
       if (!isMFB) {
         const X = "html.fcf-s:not(.fcf-off) ";
         if (f.hideRightSidebar) R.push(`${X}[role="complementary"]{display:none!important}`);
-        if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`,`html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
-        if (f.hideComposer) R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
-        if (f.hideTopBar) R.push(`${X}[role="banner"],${X}[role="navigation"][aria-label="Facebook"],${X}[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}`);
-        if (f.hideReelsTrays) R.push(`${X}[aria-label="Stories"],${X}[aria-label="Reels"]{display:none!important}`);
+        if (f.hideLeftSidebar)  R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`,`html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
+        if (f.hideComposer)     R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
+        if (f.hideTopBar)       R.push(`${X}[role="banner"],${X}[role="navigation"][aria-label="Facebook"],${X}[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}`);
+        if (f.hideReelsTrays)   R.push(`${X}[aria-label="Stories"],${X}[aria-label="Reels"]{display:none!important}`);
         R.push(`${X}[role="main"]{margin-left:auto!important;margin-right:auto!important}`);
         if (f.hideTopBar) R.push(`${X}body{padding-top:0!important}`);
       }
@@ -698,8 +759,8 @@
 
     function readText(scope, bt, bb) {
       const g = []; let budget = 600;
-      const w = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null); let n;
-      while ((n = w.nextNode()) && budget-- > 0) {
+      const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null); let n;
+      while ((n = walker.nextNode()) && budget-- > 0) {
         const s = n.nodeValue; if (!s?.trim()) continue;
         const p = n.parentElement; if (!p || p.closest('[aria-hidden="true"]')) continue;
         const cs = getComputedStyle(p);
@@ -718,150 +779,149 @@
     }
 
     const isJunk = (c) => MARKS.some((m)=>c.includes(m)) || EXACT.includes(c);
-    let _feed = null, _skipEl = null, _skipN = 0;
-    interceptNav(() => { _feed = null; _skipEl = null; _skipN = 0; });
+    let _feed=null, _skipEl=null, _skipN=0;
+    interceptNav(() => { _feed=null; _skipEl=null; _skipN=0; });
 
     function feedBox() {
       if (_feed?.isConnected) return _feed;
-      const main = q('[role="main"]'); if (!main) return null;
-      let best = null, bn = 1;
+      const main = q('[role="main"]'); if(!main) return null;
+      let best=null,bn=1;
       for (const d of main.querySelectorAll("div")) {
-        let n = 0; for (const c of d.children) { const r = c.getBoundingClientRect(); if (r.width >= 500 && r.width <= 720 && r.height > 60) n++; }
-        if (n > bn) { bn = n; best = d; }
+        let n=0; for (const c of d.children){const r=c.getBoundingClientRect();if(r.width>=500&&r.width<=720&&r.height>60)n++;}
+        if(n>bn){bn=n;best=d;}
       }
-      return (_feed = best);
+      return (_feed=best);
     }
 
     function processDesktop() {
-      const fd = feedBox(); if (!fd) return;
-      const vh = innerHeight;
+      const fd=feedBox(); if(!fd) return; const vh=innerHeight;
       for (const st of fd.children) {
-        if (st._wc === "h" || st._wc === "c") continue;
-        const r = st.getBoundingClientRect();
-        if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
-        const hdr = readText(st, r.top - 2, r.top + 130); if (!hdr) continue;
-        if (isJunk(norm(hdr)) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) { st.setAttribute("data-fcf",""); st._wc = "h"; }
-        else if ((st._wcN = (st._wcN||0)+1) >= 4) st._wc = "c";
+        if(st._wc==="h"||st._wc==="c") continue;
+        const r=st.getBoundingClientRect();
+        if(r.height<60||r.bottom<-500||r.top>vh+500) continue;
+        const hdr=readText(st,r.top-2,r.top+130); if(!hdr) continue;
+        if(isJunk(norm(hdr))||(f.hideReelsTrays&&st.querySelectorAll('a[href*="/reel/"]').length>3)){st.setAttribute("data-fcf","");st._wc="h";}
+        else if((st._wcN=(st._wcN||0)+1)>=4)st._wc="c";
       }
     }
 
     function processMobile() {
       for (const p of document.querySelectorAll("[data-tracking-duration-id]")) {
-        if (p._wc) continue; let junk = false;
+        if(p._wc) continue; let junk=false;
         for (const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
-          if (junk) break; const raw = (e.textContent||"").trim(); if (!raw||raw.length>40) continue;
-          const t = norm(raw); if (!t) continue;
-          if (MARKS.some((m)=>t===m||t.startsWith(m)) || EXACT.includes(t)) junk = true;
+          if(junk) break; const raw=(e.textContent||"").trim(); if(!raw||raw.length>40) continue;
+          const t=norm(raw); if(!t) continue;
+          if(MARKS.some((m)=>t===m||t.startsWith(m))||EXACT.includes(t))junk=true;
         }
-        if (junk) { p.setAttribute("data-fcf",""); p._wc = "h"; }
-        else if ((p._wcN=(p._wcN||0)+1)>=4) p._wc = "c";
+        if(junk){p.setAttribute("data-fcf","");p._wc="h";}
+        else if((p._wcN=(p._wcN||0)+1)>=4)p._wc="c";
       }
     }
 
     function hideLeftNav() {
-      if (!f.hideLeftSidebar) return;
+      if(!f.hideLeftSidebar) return;
       for (const n of document.querySelectorAll('[role="navigation"]:not([data-fcf-ln])')) {
-        const r = n.getBoundingClientRect();
-        if (r.height>350 && r.width>=120 && r.width<=460 && r.left<=24) n.setAttribute("data-fcf-ln","");
+        const r=n.getBoundingClientRect();
+        if(r.height>350&&r.width>=120&&r.width<=460&&r.left<=24)n.setAttribute("data-fcf-ln","");
       }
     }
 
-    const _reelSt = new WeakMap(); let _skipT = 0;
+    const _reelSt=new WeakMap(); let _skipT=0;
     function handleReels() {
-      if (!f.skipReelsAds || !/^\/reels?(\/|$)/.test(location.pathname)) return;
-      const cy = innerHeight/2; let act = null, best = 1e9;
-      for (const v of document.querySelectorAll("video")) { const r = v.getBoundingClientRect(); if (r.height<200) continue; const d = Math.abs((r.top+r.bottom)/2-cy); if (d<best){best=d;act=v;} }
-      if (!act) return;
-      let rl = act; for (let i=0;i<12&&rl.parentElement;i++){rl=rl.parentElement;if(rl.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]'))break;}
-      if (!reelSpon(rl,act)){if(act!==_skipEl){_skipEl=null;_skipN=0;}return;}
-      if (act!==_skipEl){_skipEl=act;_skipN=0;}
-      if (Date.now()-_skipT<600||_skipN>=8) return; _skipN++;_skipT=Date.now();
-      const nx = q('[role="button"][aria-label="Next Card"]'); if(nx){nx.click();return;}
-      const tg = rl.closest("[tabindex]")||rl;
-      for (const tp of ["keydown","keyup"]) tg.dispatchEvent(new KeyboardEvent(tp,{key:"ArrowDown",code:"ArrowDown",keyCode:40,which:40,bubbles:true}));
+      if(!f.skipReelsAds||!/^\/reels?(\/|$)/.test(location.pathname)) return;
+      const cy=innerHeight/2; let act=null,best=1e9;
+      for (const v of document.querySelectorAll("video")){const r=v.getBoundingClientRect();if(r.height<200)continue;const d=Math.abs((r.top+r.bottom)/2-cy);if(d<best){best=d;act=v;}}
+      if(!act) return;
+      let rl=act; for(let i=0;i<12&&rl.parentElement;i++){rl=rl.parentElement;if(rl.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]'))break;}
+      if(!reelSpon(rl,act)){if(act!==_skipEl){_skipEl=null;_skipN=0;}return;}
+      if(act!==_skipEl){_skipEl=act;_skipN=0;}
+      if(Date.now()-_skipT<600||_skipN>=8) return; _skipN++;_skipT=Date.now();
+      const nx=q('[role="button"][aria-label="Next Card"]'); if(nx){nx.click();return;}
+      const tg=rl.closest("[tabindex]")||rl;
+      for(const tp of["keydown","keyup"])tg.dispatchEvent(new KeyboardEvent(tp,{key:"ArrowDown",code:"ArrowDown",keyCode:40,which:40,bubbles:true}));
     }
 
     function reelSpon(rl,key) {
       let st=_reelSt.get(key); if(!st)_reelSt.set(key,(st={s:false,n:0}));
-      if(st.s)return true;if(st.n>=8)return false;st.n++;
+      if(st.s)return true; if(st.n>=8)return false; st.n++;
       const r=rl.getBoundingClientRect(),c=norm(readText(rl,r.top-2,r.bottom+2));
-      if(SPON.some((m)=>c.includes(m)))st.s=true;return st.s;
+      if(SPON.some((m)=>c.includes(m)))st.s=true; return st.s;
     }
 
-    const TKEYS = new Set("fbclid gclid dclid gbraid wbraid msclkid yclid twclid igshid mc_eid mc_cid _openstat vero_id oly_enc_id oly_anon_id wickedid _hsenc _hsmi mkt_tok ref refsrc refid fref hc_ref hc_location ref_src ref_url eav paipv comment_tracking av rdid".split(" "));
-    const SHIMS = new Set(["l.facebook.com","lm.facebook.com","l.messenger.com"]);
-    const isTK = (k) => TKEYS.has(k) || k.startsWith("utm_") || k.startsWith("__");
+    const TKEYS=new Set("fbclid gclid dclid gbraid wbraid msclkid yclid twclid igshid mc_eid mc_cid _openstat vero_id oly_enc_id oly_anon_id wickedid _hsenc _hsmi mkt_tok ref refsrc refid fref hc_ref hc_location ref_src ref_url eav paipv comment_tracking av rdid".split(" "));
+    const SHIMS=new Set(["l.facebook.com","lm.facebook.com","l.messenger.com"]);
+    const isTK=(k)=>TKEYS.has(k)||k.startsWith("utm_")||k.startsWith("__");
 
     function cleanUrl(href) {
       let u; try{u=new URL(href,location.href)}catch(_){return null;} let dirty=false;
-      if (SHIMS.has(u.hostname) && u.pathname==="/l.php") { const real=u.searchParams.get("u"); if(real)try{const x=new URL(real);if(/^https?:$/.test(x.protocol)){u=x;dirty=true;}}catch(_){} }
-      for (const k of [...u.searchParams.keys()]) if(isTK(k)){u.searchParams.delete(k);dirty=true;}
-      return dirty ? u.toString() : null;
+      if(SHIMS.has(u.hostname)&&u.pathname==="/l.php"){const real=u.searchParams.get("u");if(real)try{const x=new URL(real);if(/^https?:$/.test(x.protocol)){u=x;dirty=true;}}catch(_){}}
+      for(const k of[...u.searchParams.keys()])if(isTK(k)){u.searchParams.delete(k);dirty=true;}
+      return dirty?u.toString():null;
     }
 
     function cleanLinks() {
-      const h = cleanUrl(location.href); if(h)history.replaceState(history.state,"",h);
-      for (const a of document.querySelectorAll('a[href^="http"]:not([data-fcf-cl])')) {
+      const h=cleanUrl(location.href); if(h)history.replaceState(history.state,"",h);
+      for(const a of document.querySelectorAll('a[href^="http"]:not([data-fcf-cl])')){
         a.setAttribute("data-fcf-cl","");
-        const c = cleanUrl(a.getAttribute("data-lynx-uri")||a.href); if(c)a.href=c;
+        const c=cleanUrl(a.getAttribute("data-lynx-uri")||a.href);if(c)a.href=c;
         a.removeAttribute("ping");a.removeAttribute("data-lynx-uri");
       }
     }
 
-    const isFeed = ()=>{const pp=location.pathname;return pp==="/"||pp==="/home.php";};
-    const isClean = ()=>{const pp=location.pathname.replace(/\/$/,"");return isFeed()||pp==="/groups/feed"||pp==="/watch"||/^\/groups\/[^/]+$/.test(pp);};
+    const isFeed=()=>{const pp=location.pathname;return pp==="/"||pp==="/home.php";};
+    const isClean=()=>{const pp=location.pathname.replace(/\/$/,"");return isFeed()||pp==="/groups/feed"||pp==="/watch"||/^\/groups\/[^/]+$/.test(pp);};
 
-    function sweep() {
-      try { if(f.stripTracking)cleanLinks(); if(isMFB){processMobile();return;} hideLeftNav();
-        document.documentElement.classList.toggle("fcf-s",isFeed()); if(isClean())processDesktop(); handleReels(); } catch(_){}
+    function sweep(){
+      try{if(f.stripTracking)cleanLinks();if(isMFB){processMobile();return;}hideLeftNav();document.documentElement.classList.toggle("fcf-s",isFeed());if(isClean())processDesktop();handleReels();}catch(_){}
     }
 
-    let scheduled = false;
-    const idle = window.requestIdleCallback?.bind(window) ?? requestAnimationFrame;
-    const schedule = () => { if (!scheduled) { scheduled = true; idle(() => { scheduled = false; sweep(); }); } };
-    if (!isMFB) document.documentElement.classList.toggle("fcf-s", isFeed());
-    onReady(() => {
+    let scheduled=false;
+    const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame;
+    const schedule=()=>{if(!scheduled){scheduled=true;idle(()=>{scheduled=false;sweep();});}};
+    if(!isMFB)document.documentElement.classList.toggle("fcf-s",isFeed());
+    onReady(()=>{
       sweep();
-      new MutationObserver(schedule).observe(document.documentElement, { childList:true, subtree:true });
-      window.addEventListener("scroll", schedule, { passive:true });
-      setInterval(sweep, isMFB ? 1000 : 1500);
+      new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
+      window.addEventListener("scroll",schedule,{passive:true});
+      setInterval(sweep,isMFB?1000:1500);
     });
-    onHotkey(() => f.toggleHotkey, () => toggleFB(!C.facebook.enabled));
+    onHotkey(()=>f.toggleHotkey,()=>toggleFB(!C.facebook.enabled));
   }
 
   // ── youtube ────────────────────────────────────────────────
   function toggleYT(on) {
-    C.youtube.enabled = on; save("youtube");
-    const s = document.getElementById("yt-css"); if(s)s.disabled=!on;
-    const b = document.getElementById("yt-btn"); if(b)b.style.opacity=on?"1":".3";
+    C.youtube.enabled=on;save("youtube");
+    const s=document.getElementById("yt-css");if(s)s.disabled=!on;
+    const b=document.getElementById("yt-btn");if(b)b.style.opacity=on?"1":".3";
   }
 
   function initYT() {
-    const y = C.youtube;
-    const SEL = {
-      ban: "#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",
-      feed: "ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytm-companion-slot-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer",
-      wrap: "ytd-rich-item-renderer,ytd-rich-section-renderer,ytm-rich-item-renderer,ytm-item-section-renderer",
-      skip: ".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-button-slot button",
-      clos: ".ytp-ad-overlay-close-button,.ytp-ad-overlay-close-container button",
+    const y=C.youtube;
+    const SEL={
+      ban:"#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",
+      feed:"ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytm-companion-slot-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer",
+      wrap:"ytd-rich-item-renderer,ytd-rich-section-renderer,ytm-rich-item-renderer,ytm-item-section-renderer",
+      skip:".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-button-slot button",
+      clos:".ytp-ad-overlay-close-button,.ytp-ad-overlay-close-container button",
     };
     const AD_V=["ad-showing","ad-interrupting"],AD_S=["ad-showing","ad-interrupting","ad-created"];
-    const hasC = (el,cl)=>!!el&&cl.some((c)=>el.classList.contains(c));
+    const hasC=(el,cl)=>!!el&&cl.some((c)=>el.classList.contains(c));
     const rules=[...(y.hideBanners?[SEL.ban]:[]),...(y.hideFeedAds?[SEL.feed,"[data-yt-h]"]:[])];
-    if (rules.length) addStyle("yt-css",rules.join(",")+"{display:none!important}");
-    if (!y.enabled){const ss=document.getElementById("yt-css");if(ss)ss.disabled=true;}
+    if(rules.length)addStyle("yt-css",rules.join(",")+"{display:none!important}");
+    if(!y.enabled){const ss=document.getElementById("yt-css");if(ss)ss.disabled=true;}
     let muted=false,lastShort=0;
     interceptNav(()=>{lastShort=0;});
 
-    function tick() {
+    function tick(){
       if(!y.enabled)return;
-      try {
+      try{
         if(y.dismissAntiAdblock){const enf=q("ytd-enforcement-message-view-model");if(enf){(enf.closest("tp-yt-paper-dialog")||enf).remove();q("tp-yt-iron-overlay-backdrop")?.remove();document.body?.style.removeProperty("overflow");const vi=q("video");if(vi?.paused)vi.play().catch(()=>{});}}
         if(y.skipVideoAds){const pl=q("#movie_player,.html5-video-player"),v=q(".html5-video-player video")||q("video");
-          if(hasC(pl,AD_V)){const sk=q(SEL.skip);if(sk)sk.click();if(v){if(y.muteAds&&!v.muted){v.muted=true;muted=true;}if(!sk&&isFinite(v.duration)&&v.duration>1)v.currentTime=v.duration-.1;}q(SEL.clos)?.click();}else if(v&&muted){v.muted=false;muted=false;}}
+          if(hasC(pl,AD_V)){const sk=q(SEL.skip);if(sk)sk.click();if(v){if(y.muteAds&&!v.muted){v.muted=true;muted=true;}if(!sk&&isFinite(v.duration)&&v.duration>1)v.currentTime=v.duration-.1;}q(SEL.clos)?.click();}
+          else if(v&&muted){v.muted=false;muted=false;}}
         if(y.skipShortsAds&&/^\/shorts/.test(location.pathname)){const sp=q("#shorts-player"),adOn=hasC(sp,AD_S)||!!q("ytd-reel-video-renderer ad-slot-renderer,ytd-reel-video-renderer ytd-ad-slot-renderer,ytd-shorts ytd-ad-slot-renderer,ytd-shorts ad-slot-renderer");
           if(adOn&&Date.now()-lastShort>700){lastShort=Date.now();const nx=q('#navigation-button-down button,button[aria-label="Next video"],button[aria-label="Next Short"]');nx?nx.click():document.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));}}
-      } catch(_){}
+      }catch(_){}
     }
 
     function hideFeedAds(){if(!y.hideFeedAds)return;for(const ad of document.querySelectorAll(SEL.feed)){const w=ad.closest(SEL.wrap);if(w)w.setAttribute("data-yt-h","");}}
@@ -873,15 +933,15 @@
   }
 
   // ── GM menu ────────────────────────────────────────────────
-  function regMenu() {
-    if (typeof GM_registerMenuCommand !== "function") return;
-    const h = bare();
-    GM_registerMenuCommand("⚙ Web Cleaner", Panel.open);
+  function regMenu(){
+    if(typeof GM_registerMenuCommand!=="function")return;
+    const h=bare();
+    GM_registerMenuCommand("⚙ Web Cleaner",Panel.open);
     GM_registerMenuCommand(`${C.siteBlocker.enabled?"⛔ ON":"✅ OFF"} toggle`,()=>applyEdit("siteBlocker",()=>{C.siteBlocker.enabled=!C.siteBlocker.enabled;},"block"));
     GM_registerMenuCommand(`➕ Block ${h}`,()=>applyEdit("siteBlocker",()=>{if(!C.siteBlocker.custom.includes(h))C.siteBlocker.custom.push(h);C.siteBlocker.allow=C.siteBlocker.allow.filter((d)=>d!==h);},"block"));
     GM_registerMenuCommand(`➖ Allow ${h}`,()=>applyEdit("siteBlocker",()=>{if(!C.siteBlocker.allow.includes(h))C.siteBlocker.allow.push(h);C.siteBlocker.custom=C.siteBlocker.custom.filter((d)=>d!==h);},"block"));
-    if(isFB) GM_registerMenuCommand(`🧹 FB ${C.facebook.enabled?"ON":"OFF"}`,()=>toggleFB(!C.facebook.enabled));
-    if(isYT) GM_registerMenuCommand(`⏭ YT ${C.youtube.enabled?"ON":"OFF"}`,()=>toggleYT(!C.youtube.enabled));
+    if(isFB)GM_registerMenuCommand(`🧹 FB ${C.facebook.enabled?"ON":"OFF"}`,()=>toggleFB(!C.facebook.enabled));
+    if(isYT)GM_registerMenuCommand(`⏭ YT ${C.youtube.enabled?"ON":"OFF"}`,()=>toggleYT(!C.youtube.enabled));
     GM_registerMenuCommand("🖥 Desktop",()=>setVM("desktop"));
     GM_registerMenuCommand("📱 Mobile",()=>setVM("mobile"));
     GM_registerMenuCommand("↺ Auto",()=>setVM("auto"));
