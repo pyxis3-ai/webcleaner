@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      7.0.0
+// @version      7.1.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -498,7 +498,7 @@
 
     // Cache feed container — only re-scan when invalidated by nav
     let _feed=null,_skipEl=null,_skipN=0;
-    interceptNav(()=>{_feed=null;_skipEl=null;_skipN=0;});
+    interceptNav(()=>{_feed=null;_skipEl=null;_skipN=0;_mobCandSel=null;});
 
     function feedBox(){
       if(_feed?.isConnected) return _feed;
@@ -531,8 +531,37 @@
       }
     }
 
+    // Mobile feed markup rotates constantly. data-tracking-duration-id is
+    // the known-good hook but Meta drops/renames it without warning — when
+    // it's gone the old code silently matched zero nodes and every mobile
+    // toggle looked broken. Try a ranked list of candidate selectors and
+    // stick with whichever one actually returns post-shaped nodes, so
+    // filtering degrades gracefully instead of going fully dark.
+    const MOB_CANDIDATES=[
+      "[data-tracking-duration-id]",
+      "[data-sigil~='m-feed-voice-subtitle']",
+      "article[role='article']",
+      "div[role='article']",
+      "div[data-testid='story-subtitle']",
+    ];
+    let _mobCandSel=null,_mobWarned=false;
+
+    function mobilePostNodes(){
+      if(_mobCandSel){
+        const cached=document.querySelectorAll(_mobCandSel);
+        if(cached.length) return cached;
+        _mobCandSel=null; // selector stopped matching (nav changed feed), re-probe
+      }
+      for(const sel of MOB_CANDIDATES){
+        const found=document.querySelectorAll(sel);
+        if(found.length){_mobCandSel=sel;return found;}
+      }
+      if(!_mobWarned){_mobWarned=true;console.warn("[Web Cleaner] no mobile FB post selector matched — sponsored/suggested filtering is inactive on this page. Selectors likely need updating.");}
+      return [];
+    }
+
     function processMobile(){
-      for(const p of document.querySelectorAll("[data-tracking-duration-id]")){
+      for(const p of mobilePostNodes()){
         if(p._wc)continue;let junk=false;
         for(const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')){
           if(junk)break;const raw=(e.textContent||"").trim();if(!raw||raw.length>40)continue;
@@ -594,7 +623,7 @@
 
   function initYT(){
     const y=C.youtube;
-    const SEL={ban:"#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",feed:"ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytm-companion-slot-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer",wrap:"ytd-rich-item-renderer,ytd-rich-section-renderer,ytm-rich-item-renderer,ytm-item-section-renderer",skip:".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-button-slot button",clos:".ytp-ad-overlay-close-button,.ytp-ad-overlay-close-container button"};
+    const SEL={ban:"#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",feed:"ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytm-companion-slot-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer",wrap:"ytd-rich-item-renderer,ytd-rich-section-renderer,ytm-rich-item-renderer,ytm-item-section-renderer",skip:".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-button-slot button",clos:".ytp-ad-overlay-close-button,.ytp-ad-overlay-close-container button",adui:".ytp-ad-player-overlay,.ytp-ad-player-overlay-instream-info,.ytp-ad-preview-container,.ytp-ad-text,.ytp-ad-duration-remaining"};
     const AD_V=["ad-showing","ad-interrupting"],AD_S=["ad-showing","ad-interrupting","ad-created"];
     const hasC=(el,cl)=>!!el&&cl.some(c=>el.classList.contains(c));
 
@@ -614,14 +643,45 @@
     }
 
     let muted=false,lastShort=0;
+    // Dialog nodes handled once by identity — dismissAntiAdblock used to
+    // re-run every tick (~1s) as long as the (hidden but not removed)
+    // dialog element lingered, which meant it kept force-calling
+    // video.play() on every tick, including on a video the user had
+    // deliberately paused for an unrelated reason. Track handled nodes
+    // in a WeakSet so each dialog instance is only acted on once.
+    const _dismissedEnf=new WeakSet();
     interceptNav(()=>{lastShort=0;});
 
     function tick(){
       if(!y.enabled)return;
       try{
-        if(y.dismissAntiAdblock){const enf=q("ytd-enforcement-message-view-model");if(enf){(enf.closest("tp-yt-paper-dialog")||enf).remove();q("tp-yt-iron-overlay-backdrop")?.remove();document.body?.style.removeProperty("overflow");const vi=q("video");if(vi?.paused)vi.play().catch(()=>{});}}
-        if(y.skipVideoAds){const pl=q("#movie_player,.html5-video-player"),v=q(".html5-video-player video")||q("video");if(hasC(pl,AD_V)){const sk=q(SEL.skip);if(sk)sk.click();if(v){if(y.muteAds&&!v.muted){v.muted=true;muted=true;}if(!sk&&isFinite(v.duration)&&v.duration>1)v.currentTime=v.duration-.1;}q(SEL.clos)?.click();}else if(v&&muted){v.muted=false;muted=false;}}
-        if(y.skipShortsAds&&/^\/shorts/.test(location.pathname)){const sp=q("#shorts-player"),adOn=hasC(sp,AD_S)||!!q("ytd-reel-video-renderer ad-slot-renderer,ytd-reel-video-renderer ytd-ad-slot-renderer,ytd-shorts ytd-ad-slot-renderer,ytd-shorts ad-slot-renderer");if(adOn&&Date.now()-lastShort>700){lastShort=Date.now();const nx=q('#navigation-button-down button,button[aria-label="Next video"],button[aria-label="Next Short"]');nx?nx.click():document.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));}}
+        if(y.dismissAntiAdblock){
+          const enf=q("ytd-enforcement-message-view-model");
+          if(enf&&!_dismissedEnf.has(enf)){
+            _dismissedEnf.add(enf);
+            (enf.closest("tp-yt-paper-dialog")||enf).remove();
+            q("tp-yt-iron-overlay-backdrop")?.remove();
+            document.body?.style.removeProperty("overflow");
+            const vi=q("video");if(vi?.paused)vi.play().catch(()=>{});
+          }
+        }
+        if(y.skipVideoAds){
+          const pl=q("#movie_player,.html5-video-player"),v=q(".html5-video-player video")||q("video");
+          // YouTube reuses/renames these player classes without notice.
+          // Trusting classList alone caused false positives on ordinary
+          // videos, which got seeked straight to the end. Require actual
+          // ad UI (skip button or ad overlay/label) to be present before
+          // treating it as a real ad.
+          const adUiPresent=!!q(SEL.skip)||!!q(SEL.adui);
+          if(hasC(pl,AD_V)&&adUiPresent){const sk=q(SEL.skip);if(sk)sk.click();if(v){if(y.muteAds&&!v.muted){v.muted=true;muted=true;}if(!sk&&isFinite(v.duration)&&v.duration>1)v.currentTime=v.duration-.1;}q(SEL.clos)?.click();}
+          else if(v&&muted){v.muted=false;muted=false;}
+        }
+        if(y.skipShortsAds&&/^\/shorts/.test(location.pathname)){
+          const sp=q("#shorts-player");
+          const shortsAdUi=!!q('.ytp-ad-player-overlay,.ytp-ad-preview-container,ytd-ad-slot-renderer,ad-slot-renderer');
+          const adOn=(hasC(sp,AD_S)&&shortsAdUi)||!!q("ytd-reel-video-renderer ad-slot-renderer,ytd-reel-video-renderer ytd-ad-slot-renderer,ytd-shorts ytd-ad-slot-renderer,ytd-shorts ad-slot-renderer");
+          if(adOn&&Date.now()-lastShort>700){lastShort=Date.now();const nx=q('#navigation-button-down button,button[aria-label="Next video"],button[aria-label="Next Short"]');nx?nx.click():document.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));}
+        }
       }catch(_){}
     }
 
