@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.2.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.2.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -66,6 +66,10 @@ Site Blocker deliberately has no floating button — it matches every page on th
 - **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
 
 ## Changelog
+
+### 8.2.1
+
+- **Fixed: no filtering at all on mobile Facebook.** `forceMostRecent` redirected to `/?sk=h_chr` and returned early, but mobile Facebook silently strips that parameter and serves `/` again — so the redirect fired on every load and the module never got past it. Filtering never initialised, and every sponsored post stayed visible. The redirect is now attempted at most once per tab, after which setup proceeds normally. Desktop still lands on the chronological feed.
 
 ### 8.2.0
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.2.0
+// @version      8.2.1
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -481,7 +481,15 @@
 
   function initFB(){
     const f=C.facebook;if(!f.enabled)document.documentElement.classList.add("fcf-off");
-    if(f.forceMostRecent&&(location.pathname==="/"||location.pathname==="/home.php")&&!/[?&]sk=/.test(location.search)){location.replace(location.origin+"/?sk=h_chr");return;}
+    if(f.forceMostRecent&&(location.pathname==="/"||location.pathname==="/home.php")&&!/[?&]sk=/.test(location.search)){
+      let tried=false;
+      try{tried=sessionStorage.getItem(PFX+"chr")==="1";}catch(_){}
+      if(!tried){
+        try{sessionStorage.setItem(PFX+"chr","1");}catch(_){}
+        location.replace(location.origin+"/?sk=h_chr");
+        return;
+      }
+    }
     const SPON="sponsored paidpartnership publicidad patrocinado sponsoris commandit gesponsert sponsorizzat gesponsord bersponsor sponsorlu sponsorowan sponsrad sponset sponsoreret ممول ממומן реклама 広告 광고 赞助 贊助 χορηγούμενη".split(" ").map(norm);
     const MARKS=[...(f.hideSponsored?SPON:[]),...(f.hideSuggested?["suggestedforyou","suggestedpost","pagesforyou","pagesyoumaylike","groupsyoumaylike"]:[]),...(f.hidePeopleYouMayKnow?["peopleyoumayknow"]:[]),...f.extraJunkPhrases.map(norm)];
     const EXACT=f.hideReelsTrays?["reels","reelsandshortvideos","stories"]:[];
