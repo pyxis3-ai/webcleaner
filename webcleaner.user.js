@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.7.0
+// @version      8.7.1
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -887,13 +887,14 @@
       if(!feed)return;
       _liFeed=feed;
       if(L.widenFeed&&feed.getAttribute("data-li-feed")===null)feed.setAttribute("data-li-feed","");
-      const fr=feed.getBoundingClientRect();
       for(const e of document.querySelectorAll("aside")){
         if(e.hasAttribute("data-li-rail"))continue;
+        if(e===feed||e.contains(feed)||feed.contains(e))continue;
         const r=e.getBoundingClientRect();
         if(r.height<200||r.width<140||r.width>420)continue;
-        if(L.hideLeftRail&&r.right<=fr.left+12)e.setAttribute("data-li-rail","");
-        else if(L.hideRightRail&&r.left>=fr.right-12)e.setAttribute("data-li-rail","");
+        const mid=r.left+r.width/2;
+        if(L.hideLeftRail&&mid<innerWidth/2)e.setAttribute("data-li-rail","");
+        else if(L.hideRightRail&&mid>=innerWidth/2)e.setAttribute("data-li-rail","");
       }
     }
     const MK=[...(L.hidePromoted?["promoted","sponsored","anzeige","promocionado","sponsorisé","gesponsord"]:[]),

@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.7.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.7.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.7.1
+
+- **Fixed rails reappearing, compressed, after the feed is widened.** Rails were identified by comparing their position against the feed's *current* rect — but widening the feed moves its edges, so on later passes the rails overlapped it and no longer qualified. They stayed visible and were then squeezed by the wider feed. The module was measuring against a value it had itself changed. Rails are now identified independently: a narrow `<aside>` that is neither inside the feed nor contains it, assigned left or right by which half of the viewport its midpoint falls in. Verified by simulation across feed widths of 550px and 900px — the old rule stops tagging at 900px, the new one holds. **Not yet verified on a live feed**, as the session was unavailable.
 
 ### 8.7.0
 
