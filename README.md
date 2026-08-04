@@ -85,7 +85,7 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ### 8.5.0
 
-- **Added LinkedIn.** Hides Promoted posts and, optionally, Suggested/recommended content in the feed. Toggle with `Alt+Shift+L`, the 💼 button, or the panel. LinkedIn has moved to fully hashed class names — `feed-shared-update-v2`, `data-urn` and the other long-standing selectors all match nothing now — so this module uses no selectors at all. It reads rendered text and hides the tightest post-sized element containing a Promoted label, the same approach that makes the rotation fallback honeypot-immune. Verified on a live feed: 5 promoted posts hidden with 69 genuine posts untouched. Two promoted units in the narrow right rail are not caught yet, as they fall below the module's minimum card width — main-feed coverage is the goal here.
+- **Added LinkedIn.** Hides Promoted posts and, optionally, Suggested/recommended content in the feed. Toggle with `Alt+Shift+L`, the 💼 button, or the panel. LinkedIn has moved to fully hashed class names — `feed-shared-update-v2`, `data-urn` and the other long-standing selectors all match nothing now — so this module uses no selectors at all. It reads rendered text and hides the tightest post-sized element containing a Promoted label, the same approach that makes the rotation fallback honeypot-immune. Verified on a live feed: 5 promoted posts hidden with 69 genuine posts untouched. Two promoted units on the live feed were not caught. The cause is not yet known: a fixture reproducing LinkedIn's structure shows the current bounds *do* catch a 300px right-rail ad, so the earlier guess that they fell below the minimum card width is wrong. Diagnosing it needs their measured dimensions from a logged-in feed.
 
 ### 8.4.0
 
