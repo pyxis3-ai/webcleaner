@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.5.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.5.2** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -83,13 +83,17 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.5.2
+
+- **Fixed: promoted posts stayed visible while scrolling LinkedIn.** LinkedIn scrolls an inner container (`main#workspace`), not the window, so the module's `window` scroll listener never fired and sweeps fell back to the 1.5s timer — which you outscroll. Measured on the live feed: scrolling that container produced **0 window scroll events and 7 capture-phase events**. Both Facebook and LinkedIn now also listen in the capture phase on `document`, which catches scrolling from any container. The detection itself was never at fault: once a promoted post was in view, the existing sweep hid it correctly.
+
 ### 8.5.1
 
 - **Fixed a hole in all three tightest-match scanners** (LinkedIn, the Facebook tile-grid pass, and the rotation fallback). Each skipped a matching element if one of its children also matched — correct, so a row is never hidden for one ad tile. But the child test only checked width and minimum height, while the main loop also enforces a maximum height and a viewport band. So an oversized or off-screen matching child would suppress its parent and then be rejected itself, and **neither was hidden**. Proven on a fixture: a 718px card containing a 2000px matching child was missed by the old logic and is caught by the new. A child now only suppresses its parent if it would itself be eligible.
 
 ### 8.5.0
 
-- **Added LinkedIn.** Hides Promoted posts and, optionally, Suggested/recommended content in the feed. Toggle with `Alt+Shift+L`, the 💼 button, or the panel. LinkedIn has moved to fully hashed class names — `feed-shared-update-v2`, `data-urn` and the other long-standing selectors all match nothing now — so this module uses no selectors at all. It reads rendered text and hides the tightest post-sized element containing a Promoted label, the same approach that makes the rotation fallback honeypot-immune. Verified on a live feed: 5 promoted posts hidden with 69 genuine posts untouched. Two promoted units on the live feed were not caught in 8.5.0. The width bound was ruled out by fixture, and the actual cause — a matching child suppressing its parent and then being rejected itself — was found and fixed in 8.5.1. Whether that fully accounts for both units still wants confirming on a live feed.
+- **Added LinkedIn.** Hides Promoted posts and, optionally, Suggested/recommended content in the feed. Toggle with `Alt+Shift+L`, the 💼 button, or the panel. LinkedIn has moved to fully hashed class names — `feed-shared-update-v2`, `data-urn` and the other long-standing selectors all match nothing now — so this module uses no selectors at all. It reads rendered text and hides the tightest post-sized element containing a Promoted label, the same approach that makes the rotation fallback honeypot-immune. Verified on a live feed: 5 promoted posts hidden with 69 genuine posts untouched. The two promoted units that survived 8.5.0 were traced to scroll detection, fixed in 8.5.2: LinkedIn scrolls an inner container so the window scroll listener never fired. The 8.5.1 eligibility fix was a separate real bug found along the way.
 
 ### 8.4.0
 

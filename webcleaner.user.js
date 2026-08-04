@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.5.1
+// @version      8.5.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -749,7 +749,7 @@
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame,schedule=()=>{if(!sch){sch=true;idle(()=>{sch=false;sweep();});}};
     document.documentElement.classList.toggle("fcf-s",isFeed());
-    onReady(()=>{sweep();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(sweep,1200);setInterval(()=>{const b=document.getElementById("fcf-btn");if(b)b.style.boxShadow=healthScan()>0?"0 0 0 2px #e6b34d":"";},6000);});
+    onReady(()=>{sweep();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});document.addEventListener("scroll",schedule,{passive:true,capture:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(sweep,1200);setInterval(()=>{const b=document.getElementById("fcf-btn");if(b)b.style.boxShadow=healthScan()>0?"0 0 0 2px #e6b34d":"";},6000);});
     onHotkey(()=>f.toggleHotkey,()=>toggleFB(!C.facebook.enabled));
   }
 
@@ -891,7 +891,7 @@
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame;
     const schedule=()=>{if(!sch){sch=true;idle(()=>{sch=false;try{sweepLI();}catch(_){}});}};
-    onReady(()=>{try{sweepLI();}catch(_){}new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(()=>{try{sweepLI();}catch(_){}},1500);});
+    onReady(()=>{try{sweepLI();}catch(_){}new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});document.addEventListener("scroll",schedule,{passive:true,capture:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(()=>{try{sweepLI();}catch(_){}},1500);});
     interceptNav(()=>{});
     onHotkey(()=>L.toggleHotkey,()=>toggleLI(!C.linkedin.enabled));
   }
