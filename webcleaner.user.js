@@ -138,13 +138,14 @@
   const safeHTML=((pol=null)=>{
     if(typeof trustedTypes!=="undefined") try{pol=trustedTypes.createPolicy("wc7",{createHTML:s=>s});}catch(_){}
     return(el,html)=>{
-      try{ el.innerHTML=pol?pol.createHTML(html):html; }
+      try{ el.innerHTML=pol?pol.createHTML(html):html; return true; }
       catch(_){
         try{
           const doc=new DOMParser().parseFromString(`<!DOCTYPE html><html><head></head><body>${html}</body></html>`,"text/html");
           el.textContent="";
           for(const n of [...doc.head.childNodes,...doc.body.childNodes]) el.appendChild(document.adoptNode(n));
-        }catch(_2){}
+          return true;
+        }catch(_2){ return false; }
       }
     };
   })();
@@ -284,10 +285,23 @@
     const edit=(m,fn)=>{armed=null;applyEdit(m,fn,affects(m));};
     const onEsc=e=>{if(!armed&&e.key==="Escape"){e.preventDefault();close();}};
 
+    function degraded(sh){
+      sh.textContent="";
+      root.style.pointerEvents="none";
+      const box=mk("div",{style:"position:fixed;right:12px;bottom:64px;max-width:300px;pointer-events:auto;background:#18191c;color:#ddd;padding:12px 14px;border-radius:12px;font:13px -apple-system,system-ui,sans-serif;line-height:1.4;box-shadow:0 8px 30px rgba(0,0,0,.6)"});
+      box.appendChild(mk("div",{style:"font-weight:700;margin-bottom:5px"},"🧼 Web Cleaner"));
+      box.appendChild(mk("div",{style:"opacity:.75"},"This site's security policy blocks the settings panel. Use your userscript manager menu or the keyboard shortcuts instead."));
+      const b=mk("button",{style:"margin-top:9px;padding:5px 11px;border:0;border-radius:8px;background:#2a2a2f;color:#ddd;cursor:pointer;font-size:12px"},"Close");
+      b.addEventListener("click",close);
+      box.appendChild(b);
+      sh.appendChild(box);
+    }
+
     function render(){
       const sh=root.shadowRoot,om={};
       qa("details[data-s]",sh).forEach(d=>{om[d.getAttribute("data-s")]=d.open;});
-      safeHTML(sh,`<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-x>✕</button></div>${secSB()}${secVM()}${isFB?secFB():""}${isYT?secYT():""}${secIO()}</div>`);
+      const ok=safeHTML(sh,`<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-x>✕</button></div>${secSB()}${secVM()}${isFB?secFB():""}${isYT?secYT():""}${secIO()}</div>`);
+      if(!ok){degraded(sh);return;}
       qa("details[data-s]",sh).forEach(d=>{if(om[d.getAttribute("data-s")])d.open=true;});
       wire(sh);
     }
