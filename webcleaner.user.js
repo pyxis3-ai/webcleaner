@@ -175,6 +175,22 @@
 
   const defProp=(obj,key,get)=>{try{Object.defineProperty(obj,key,{configurable:true,get});}catch(_){}};
 
+  const SPON_LABELS=new Set(["sponsored","promoted","gesponsert","publicidad","patrocinado","publicité","anuncio","реклама","広告","광고","赞助","贊助"]);
+  const Health={miss:0,at:0};
+  function healthScan(){
+    let miss=0;
+    for(const el of document.querySelectorAll("badge-shape,span,div,p,h3,h4")){
+      if(el.children.length)continue;
+      const txt=(el.textContent||"").trim().toLowerCase();
+      if(!SPON_LABELS.has(txt))continue;
+      const r=el.getBoundingClientRect();
+      if(r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight)miss++;
+      if(miss>50)break;
+    }
+    Health.miss=miss;Health.at=Date.now();
+    return miss;
+  }
+
   const REAL_MOBILE=(()=>{
     const ua=navigator.userAgent,tp=navigator.maxTouchPoints;
     return /Mobi|Android|iPhone|iPod|Windows Phone/i.test(ua)||/iPad/.test(ua)||(/Macintosh/.test(ua)&&tp>1)||(navigator.userAgentData?.mobile===true);
@@ -304,7 +320,9 @@
     function render(){
       const sh=root.shadowRoot,om={};
       qa("details[data-s]",sh).forEach(d=>{om[d.getAttribute("data-s")]=d.open;});
-      const ok=safeHTML(sh,`<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-x>✕</button></div>${secSB()}${secVM()}${isFB?secFB():""}${isYT?secYT():""}${secIO()}</div>`);
+      const hm=(isFB||isYT)?healthScan():0;
+      const warn=hm>0?`<div class="cu" style="color:#e6b34d;padding:4px 0;border-top:1px solid #27282c">⚠ ${hm} sponsored label${hm>1?"s":""} still visible — this site's markup may have changed. Filtering is degraded, not broken.</div>`:"";
+      const ok=safeHTML(sh,`<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-x>✕</button></div>${warn}${secSB()}${secVM()}${isFB?secFB():""}${isYT?secYT():""}${secIO()}</div>`);
       if(!ok){degraded(sh);return;}
       qa("details[data-s]",sh).forEach(d=>{if(om[d.getAttribute("data-s")])d.open=true;});
       wire(sh);
@@ -628,7 +646,7 @@
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame,schedule=()=>{if(!sch){sch=true;idle(()=>{sch=false;sweep();});}};
     document.documentElement.classList.toggle("fcf-s",isFeed());
-    onReady(()=>{sweep();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(sweep,1200);});
+    onReady(()=>{sweep();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});window.addEventListener("scroll",schedule,{passive:true});setInterval(sweep,1200);setInterval(()=>{const b=document.getElementById("fcf-btn");if(b&&C.facebook.enabled)b.style.boxShadow=healthScan()>0?"0 0 0 2px #e6b34d":"";},6000);});
     onHotkey(()=>f.toggleHotkey,()=>toggleFB(!C.facebook.enabled));
   }
 
@@ -728,7 +746,7 @@
 
     function hideFeedAds(){if(!y.hideFeedAds)return;for(const ad of document.querySelectorAll(SEL.feed)){const w=ad.closest(SEL.wrap);if(w)w.setAttribute("data-yt-h","");}}
     let sch=false;const schedule=()=>{if(!sch){sch=true;requestAnimationFrame(()=>{sch=false;tick();hideFeedAds();});}};
-    onReady(()=>{tick();hideFeedAds();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});setInterval(tick,1000);});
+    onReady(()=>{tick();hideFeedAds();new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});setInterval(tick,1000);setInterval(()=>{const b=document.getElementById("yt-btn");if(b&&y.enabled)b.style.boxShadow=healthScan()>0?"0 0 0 2px #e6b34d":"";},6000);});
     onHotkey(()=>y.toggleHotkey,()=>toggleYT(!C.youtube.enabled));
   }
 
