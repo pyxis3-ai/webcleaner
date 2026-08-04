@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.9.1
+// @version      8.9.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -715,7 +715,7 @@
 
     const isJunk=c=>MARKS.some(m=>c.includes(m))||EXACT.includes(c);
 
-    const FOLLOW=new Set(["follow","seguir","suivre","folgen","segui","volgen","takip et","följ","følg","obserwuj","متابعة","подписаться","フォロー","팔로우","关注","關注"].map(norm));
+    const FOLLOW=new Set([...["follow","seguir","suivre","folgen","segui","volgen","takip et","följ","følg","obserwuj","متابعة","подписаться","フォロー","팔로우","关注","關注"],...f.extraJunkPhrases].map(norm));
     function hasFollowBtn(post,top){
       if(!f.hideFollowSuggestions)return false;
       for(const e of post.querySelectorAll('span,a,div[role="button"]')){
