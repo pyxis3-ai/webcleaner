@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.6.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.6.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -67,7 +67,7 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 | Watch | ✅ | ✅ | Facebook now redirects `/watch` to `/reel/`, so Reels handling covers it |
 | Groups feed & individual groups | ✅ | ✅ | Verified: container found, post headers read correctly |
 | Marketplace | ✅ | ✅ | Mobile via the post matcher; desktop via tile-grid detection added in 8.2.3 |
-| Stories viewer | ❌ | ❌ | Not covered. The Stories *tray* on the feed is hidden by `Reels/Stories` |
+| Stories viewer | ❌ | ❌ | Not covered. The Stories *tray* on the feed is hidden by `Reels/Stories`. The viewer is a full-screen media player, not a post list or card grid, so neither detection model applies — and it has not been possible to observe a sponsored story to build against |
 | Search, Videos, Events, Gaming, Profile | ✅ | ✅ | Covered by tile-grid detection wherever ads render as labelled cards |
 
 ## Limits — what it cannot do
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.6.1
+
+- **LinkedIn mobile verified.** Previously listed as untested. Confirmed on a live logged-in mobile session at 412×915: the feed column is 412px so it clears the module's 280px minimum, promoted posts are hidden as you scroll, none remain in view, and all 70 genuine posts are intact. Worth noting the scroll container differs by layout — `main#workspace` on desktop, the document itself on mobile — which the capture-phase listener added in 8.5.2 handles either way.
 
 ### 8.6.0
 
