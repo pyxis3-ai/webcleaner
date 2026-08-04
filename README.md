@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.1.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.2.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -67,32 +67,37 @@ Site Blocker deliberately has no floating button — it matches every page on th
 
 ## Changelog
 
-### 8.1.0
+### 8.2.0
 
 **Fixes**
 
-- **Mobile YouTube ad-skipping never worked.** The skip button is found and enabled, but `element.click()` is ignored on `m.youtube.com` — a 72-second ad ran to completion. Added a full pointer/touch tap sequence plus a seek fallback that fires after 3 ticks, so an unresponsive button can no longer keep an ad on screen.
-- **Ad-player detection was wrong.** Corrected against a captured live ad: the ad player is `getPresentingPlayerType() === 2`, not 3, and `getAdState()` stays at `-1` throughout an ad (so it is useless as a signal). Shorts ads are in-feed slots and detect through a different branch again.
-- **`frameOnDesktop` could never work.** The UA spoof ran first, so the "are we on a real phone?" check read the *spoofed* mobile UA and disabled the desktop phone-frame. Real-device detection is now captured once before any spoofing.
-- **Trusted Types could leave a dead overlay.** Where a site's CSP blocks the policy, the panel rendered empty inside a full-screen host with `pointer-events:all` — an invisible click trap. Now degrades to a dismissible notice with the host set to `pointer-events:none`.
-- **Two stale Facebook selectors.** `hideComments` and `hideLikeCounts` matched nothing (wrong `[role="article"]` scoping plus renamed labels). Now `[aria-label="Leave a comment"]` and `[aria-label^="Like:"]`.
-- **`@version` was frozen**, so auto-update would never have delivered any of the above.
-- **Storage hardening.** Import is now key-filtered, type-checked and array-sanitised (a hostile file previously changed the config object's prototype, and a type mismatch crashed the blocker inside an unguarded interval). `GM_getValue` is wrapped so a throwing manager can't kill the script.
-- **Schedule parsing.** A malformed time produced `NaN` and silently blocked the site all day; it now fails closed.
-- **Block screen under Trusted Types.** Rebuilt from DOM nodes instead of `innerHTML`, which threw after `window.stop()` and failed *open*.
-- **Misc.** Duplicate `<style>` elements on repeat calls, cluster drag triggering buttons, the View Mode button making the cluster undraggable, `exportSettings` failing in Firefox, an unthrottled full-document query per mutation.
+- **Mobile YouTube ad-skipping never worked.** The skip button is found and enabled, but `element.click()` is ignored on `m.youtube.com` — a 72-second ad ran to completion, merely muted. Because the button *was* found, the existing seek fallback never fired either. Added a full pointer/touch tap sequence plus a seek fallback after 3 ticks, so an unresponsive button can no longer keep an ad on screen.
+- **`frameOnDesktop` could never work.** The UA spoof ran first, so the "are we on a real phone?" check read the *spoofed* mobile UA and disabled the desktop phone-frame. With `spoofUA` on — the default — the whole feature was dead code. Real-device detection is now captured once before any spoofing.
+- **Trusted Types could leave a dead overlay.** Where a site's CSP blocks the script's policy, the panel rendered empty inside a full-screen host with `pointer-events:all` — an invisible click trap with no way to dismiss it. Now degrades to a small dismissible notice, with the host set to `pointer-events:none` so the page stays usable.
+- **Two stale Facebook selectors.** `hideComments` and `hideLikeCounts` matched nothing — wrong `[role="article"]` scoping (real posts are plain divs) plus renamed labels. Now `[aria-label="Leave a comment"]` and `[aria-label^="Like:"]`.
+- **Site modules ran on the block page.** After the blocker replaced the document, the Facebook module still fired its "Most Recent" redirect, so the block screen flashed and navigated away; both modules also installed observers and intervals on a page that is only a block notice.
 
 **Added**
 
-- Distraction-free YouTube watch page: hide Related, Comments, Chips, Merch/promos, Live chat; widen the player.
-- Visible degradation warning when markup rotation stops filtering from matching.
-- Focus Pack effective-state line in the Blocker panel.
+- Distraction-free YouTube watch page: hide Related, Comments, Chips, Merch/promos and Live chat, with `Widen player` expanding the video into the reclaimed space.
+- **Visible degradation warning.** If markup rotation stops filtering from matching, the panel says so and the module's button gets an amber ring — instead of failing silently. It only fires when the relevant module and its hiding option are actually on.
+- Focus Pack **effective-state** line in the Blocker panel.
 
 **Changed**
 
-- `scheduleOn` now defaults to **off**, so a fresh install no longer blocks Facebook and YouTube during work hours. Existing installs keep their saved value.
-- `hideEndCards` and `hideInfoCards` now default on.
-- Mobile YouTube ad selectors corrected (`ytm-companion-slot`, not `…-renderer`) and `ad-disclosure-banner-view-model` added.
+- `scheduleOn` now defaults to **off**, so a fresh install no longer blocks Facebook and YouTube during work hours while the Focus toggle reads OFF. Existing installs keep their saved value; the new state line makes an inherited `on` visible.
+- `hideEndCards`, `hideInfoCards` and `hideRelated` now default on.
+- README rewritten with a full feature reference, limits and this changelog.
+
+### 8.1.0
+
+- **Ad-player detection corrected against a captured live ad**: the ad player is `getPresentingPlayerType() === 2`, not 3, and `getAdState()` stays at `-1` throughout an ad, so it is useless as a signal. Shorts ads are in-feed slots and detect through a different branch again.
+- Mobile YouTube ad selectors corrected by reverse-engineering the shipped bundle — `ytm-companion-slot`, not `…-renderer` — and `ad-disclosure-banner-view-model` added. Several dead player selectors removed, and `.ytp-skip-ad-button` restored after it turned out to be present in both player bundles.
+- **Storage hardening.** Import is key-filtered, type-checked and array-sanitised: a hostile file previously replaced the config object's prototype, and a type mismatch crashed the blocker inside an unguarded interval. `GM_getValue` is wrapped so a throwing manager cannot kill the script.
+- **Schedule parsing** now fails closed — a malformed time produced `NaN` and silently blocked the site all day.
+- **Block screen under Trusted Types** rebuilt from DOM nodes instead of `innerHTML`, which threw after `window.stop()` and failed *open*.
+- Duplicate `<style>` elements on repeat calls; cluster drag triggering buttons; the View Mode button making the cluster undraggable; `exportSettings` failing in Firefox; an unthrottled full-document query per mutation.
+- **`@version` had been frozen across four releases**, so auto-update would not have delivered any of the above.
 
 ### 8.0.0
 
