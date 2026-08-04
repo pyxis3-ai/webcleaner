@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.6.6** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.6.7** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.6.7
+
+- **Fixed the actual cause of "only the feed is missing" on LinkedIn.** The promoted-post sweep could hide the feed column itself. The column contains promoted posts, so it matches the markers, and whenever no child qualified as a tighter match the whole feed was tagged and hidden — leaving every surrounding element in place. The feed container and any ancestor of it are now excluded from the sweep outright. Verified live: feed visible at 900×1280 with its content, never tagged, both rails hidden, promoted posts hidden, none left in view.
 
 ### 8.6.6
 

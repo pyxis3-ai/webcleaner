@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.6.6
+// @version      8.6.7
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -873,6 +873,7 @@
     }
     addStyle("li-css",LR.join("\n"));
 
+    let _liFeed=null;
     function tagChrome(){
       const fhi=Math.max(760,Math.min(innerWidth*0.8,1400));
       let feed=null,fscore=0;
@@ -884,6 +885,7 @@
       }
       if(!fscore)feed=null;
       if(!feed)return;
+      _liFeed=feed;
       if(L.widenFeed&&feed.getAttribute("data-li-feed")===null)feed.setAttribute("data-li-feed","");
       const fr=feed.getBoundingClientRect();
       for(const e of document.querySelectorAll("aside")){
@@ -906,6 +908,7 @@
       for(const el of document.querySelectorAll("div,article,section,li")){
         if(hid>=15)break;
         if(el._li)continue;
+        if(_liFeed&&(el===_liFeed||el.contains(_liFeed)))continue;
         const r=el.getBoundingClientRect();
         const fits=rr=>rr.width>=lo&&rr.width<=hi&&rr.height>=100&&rr.height<=Math.max(vh*2,1400)&&rr.bottom>=-500&&rr.top<=vh+500;
         if(!fits(r))continue;
