@@ -48,7 +48,7 @@
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"y"},
     },
     siteBlocker: {
-      enabled:true, blockAdult:true, blockFocus:false, scheduleOn:true, snoozeMinutes:5,
+      enabled:true, blockAdult:true, blockFocus:false, scheduleOn:false, snoozeMinutes:5,
       schedule:{days:[1,2,3,4,5],from:"09:00",to:"18:00"},
       custom:[], allow:[],
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"b"},
@@ -287,7 +287,20 @@
     return `<div class="pg">${sites.map(d=>{const on=C.siteBlocker.allow.includes(d);return`<button class="pl ${on?"al":"bl"}" data-pk="${esc(d)}">${esc(d)}</button>`;}).join("")}</div>`;
   }
 
-  const secSB=()=>{const s=C.siteBlocker;return`<details data-s=sb open><summary>⛔ Blocker ${s.enabled?"ON":"OFF"}</summary><div class="r"><div>${esc(HOST)}</div><label class="sw"><input type="checkbox" data-sw="siteBlocker.enabled"${s.enabled?" checked":""}><span class="tk"></span></label></div>${sw2("Adult","siteBlocker","blockAdult","Focus","siteBlocker","blockFocus")}${sw("Schedule ("+esc(s.schedule.from)+"–"+esc(s.schedule.to)+")","siteBlocker","scheduleOn")}${sbSnoozed()?`<div class="cu snz">⏱ Snoozed — tap cancel</div>`:""}${listBlock("Blocked","siteBlocker","custom","example.com")}${listBlock("Allowed","siteBlocker","allow","example.com")}<details data-s=focus><summary>Focus (${FOCUS.length})</summary>${packHtml(FOCUS)}</details><details data-s=adult><summary>Adult (${ADULT.length})</summary>${packHtml(ADULT)}</details><details data-s=sb-adv><summary>Advanced</summary>${time2("From","siteBlocker","from","To","to")}${numR("Snooze min","siteBlocker","snoozeMinutes")}${hkR("siteBlocker")}</details></details>`;};
+  function focusState(){
+    const s=C.siteBlocker;
+    const inSched=sbInSchedule();
+    const active=s.blockFocus||inSched;
+    const why=s.blockFocus?"Focus switch is on"
+      :inSched?`inside schedule ${esc(s.schedule.from)}–${esc(s.schedule.to)}`
+      :s.scheduleOn?`outside schedule ${esc(s.schedule.from)}–${esc(s.schedule.to)}`
+      :"Focus switch off and schedule off";
+    const hereBlocked=active&&sbMatch(FOCUS)&&!sbMatch(s.allow);
+    const col=active?"#e6b34d":"#7a7a7a";
+    return `<div class="cu" style="color:${col};padding:3px 0">${active?"●":"○"} Focus pack ${active?"BLOCKING NOW":"not blocking"} (${why})${hereBlocked?` — <b>${esc(bare())} is blocked</b>`:sbMatch(FOCUS)?` — ${esc(bare())} is in the pack`:""}</div>`;
+  }
+
+  const secSB=()=>{const s=C.siteBlocker;return`<details data-s=sb open><summary>⛔ Blocker ${s.enabled?"ON":"OFF"}</summary><div class="r"><div>${esc(HOST)}</div><label class="sw"><input type="checkbox" data-sw="siteBlocker.enabled"${s.enabled?" checked":""}><span class="tk"></span></label></div>${sw2("Adult","siteBlocker","blockAdult","Focus","siteBlocker","blockFocus")}${sw("Schedule ("+esc(s.schedule.from)+"–"+esc(s.schedule.to)+")","siteBlocker","scheduleOn")}${focusState()}${sbSnoozed()?`<div class="cu snz">⏱ Snoozed — tap cancel</div>`:""}${listBlock("Blocked","siteBlocker","custom","example.com")}${listBlock("Allowed","siteBlocker","allow","example.com")}<details data-s=focus><summary>Focus (${FOCUS.length})</summary>${packHtml(FOCUS)}</details><details data-s=adult><summary>Adult (${ADULT.length})</summary>${packHtml(ADULT)}</details><details data-s=sb-adv><summary>Advanced</summary>${time2("From","siteBlocker","from","To","to")}${numR("Snooze min","siteBlocker","snoozeMinutes")}${hkR("siteBlocker")}</details></details>`;};
 
   const secVM=()=>{const v=C.viewMode,modes=["desktop","mobile","auto"];const seg=(val,attr)=>`<button class="${(attr==="data-vm"?vmMode:v.newSiteDefault)===val?"on":""}" ${attr}="${val}">${val[0].toUpperCase()+val.slice(1)}</button>`;return`<details data-s=vm><summary>🖥 View ${vmMode.toUpperCase()}</summary><div class="r2"><span>Site</span><div class="sg">${modes.map(m=>seg(m,"data-vm")).join("")}</div><span style="margin-left:auto">Def</span><div class="sg">${modes.map(m=>seg(m,"data-df")).join("")}</div></div>${swG("viewMode",[["UA","spoofUA"],["Touch","spoofTouch"],["Media","spoofMedia"],["Frame","frameOnDesktop"],["Button","showButton"]])}<details data-s=vm-adv><summary>Advanced</summary>${num2("DeskW","viewMode","desktopWidth","MobW","viewMode","mobileWidth")}${num2("MobH","viewMode","mobileHeight","DPR","viewMode","mobileDpr")}${numR("Long-press ms","viewMode","longPressMs")}${txtR("Mobile UA","viewMode","mobileUA")}${txtR("Desktop UA","viewMode","desktopUA")}${hkR("viewMode")}</details></details>`;};
 
