@@ -200,13 +200,20 @@
   const sbSnoozed=()=>Date.now()<(gGet("snz",0));
   const sbSnooze =m=>gSet("snz",Date.now()+m*60000);
 
+  const hhmm=(s,dflt)=>{
+    const m=/^(\d{1,2}):(\d{2})$/.exec(String(s||"").trim());
+    if(!m)return dflt;
+    const h=+m[1],mi=+m[2];
+    return h>23||mi>59?dflt:h*60+mi;
+  };
+
   function sbInSchedule(){
     const{scheduleOn,schedule:sc}=C.siteBlocker;
-    if(!scheduleOn||!sc.days.includes(new Date().getDay())) return false;
+    if(!scheduleOn||!sc||!Array.isArray(sc.days)||!sc.days.includes(new Date().getDay()))return false;
     const now=new Date(),cur=now.getHours()*60+now.getMinutes();
-    const[fh,fm]=sc.from.split(":").map(Number),[th,tm2]=sc.to.split(":").map(Number);
-    const from=fh*60+fm,to=th*60+tm2;
-    return from<=to?cur>=from&&cur<to:cur>=from||cur<to;
+    const from=hhmm(sc.from,null),to=hhmm(sc.to,null);
+    if(from===null||to===null||from===to)return false;
+    return from<to?cur>=from&&cur<to:cur>=from||cur<to;
   }
 
   function blockReason(){
