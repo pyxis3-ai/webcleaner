@@ -84,6 +84,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.10.0
+
+- **New: `Block ad data` — and it closes the Shorts gap that DOM detection never could.** Shorts ads are not player ads. They arrive as ordinary entries in the `reel_watch_sequence` API response carrying `command.reelWatchEndpoint.adClientParams.isAd`, which is why walking 45 live Shorts produced no `getPresentingPlayerType()` of 2 or 3, no `ad-showing`, and no `.ytp-ad-*` markup — the markers the old Shorts gate waited for do not exist for these ads. `JSON.parse` and `Response.prototype.json` are now wrapped to drop flagged entries before the feed renders. Verified live: walking 40 Shorts across 5 `reel_watch_sequence` fetches, one real ad was removed (`oGoeeR08D8o`) — an id that had played during an earlier walk of the same feed, when detection did nothing. The approach follows uBlock Origin's maintained YouTube filters, which is where the `isAd` path was traced from.
+- **The same pass strips `adPlacements`, `playerAds` and `adSlots`,** which is what uBlock prunes for video ads. Measured honestly: it fires (32 deletions on one watch page) but it did **not** prevent an ad on initial page load, because `ytInitialPlayerResponse` is an inline object literal in the served HTML and never passes through `JSON.parse`. It is kept because it does cover player responses fetched during in-page navigation, and it is harmless — playback was unaffected and the only "error" element present was YouTube's always-present empty placeholder, not a visible failure. The skip engine remains the guarantee for video ads, not this.
+
 ### 8.9.2
 
 - **Confirmed on a live mobile ad break — the gap that was open since 8.8.2.** Two real ads captured on `m.youtube.com`. The decisive one is a 15-second ad where the ad UI never rendered: `{api:true, cls:true, ui:false, oldGate:false, newGate:true, dur:15}`. The old gate evaluated **false while an ad was actively playing**; the shipped gate caught it and muting engaged. A second 6s ad was muted and its skip button tapped. This is the mobile counterpart of the desktop break verified in 8.9.1, and it closes the last unverified claim in the ad-skip work.

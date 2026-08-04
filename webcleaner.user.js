@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.9.2
+// @version      8.10.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -41,7 +41,7 @@
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"f"},
     },
     youtube: {
-      enabled:true, skipVideoAds:true, skipShortsAds:true, hideFeedAds:true,
+      enabled:true, blockAdData:true, skipVideoAds:true, skipShortsAds:true, hideFeedAds:true,
       hideBanners:true, muteAds:true, dismissAntiAdblock:true, hideShorts:false,
       hideEndCards:true, hideInfoCards:true, hideAutoplay:false,
       hideRelated:true, hideComments:false, hideChips:true, hideMerch:true,
@@ -475,7 +475,7 @@
 
   const secFB=()=>`<details data-s=facebook><summary>🧹 FB ${C.facebook.enabled?"ON":"OFF"}</summary>${swG("facebook",[["On","enabled"],["Sponsored","hideSponsored"],["Suggested","hideSuggested"],["People YMKN","hidePeopleYouMayKnow"],["Follow suggestions","hideFollowSuggestions"],["Reels/Stories","hideReelsTrays"],["Comments","hideComments"],["Video autoplay","hideVideoAutoplay"],["Like counts","hideLikeCounts"],["R.sidebar","hideRightSidebar"],["L.sidebar","hideLeftSidebar"],["Composer","hideComposer"],["Top bar","hideTopBar"],["Tracking","stripTracking"],["Reel ads","skipReelsAds"],["Most Recent","forceMostRecent"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}${listBlock("Junk phrases","facebook","extraJunkPhrases","phrase")}<details data-s=fb-adv><summary>Advanced</summary>${numR("Feed max width","facebook","feedMaxWidth")}${hkR("facebook")}</details></details>`;
 
-  const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Seek past ads","seekPastAds"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
+  const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Block ad data","blockAdData"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Seek past ads","seekPastAds"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
 
   const secLI=()=>`<details data-s=linkedin><summary>💼 LinkedIn ${C.linkedin.enabled?"ON":"OFF"}</summary>${swG("linkedin",[["On","enabled"],["Promoted","hidePromoted"],["Suggested","hideSuggested"],["Top bar","hideTopBar"],["L.rail","hideLeftRail"],["R.rail","hideRightRail"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}<details data-s=li-adv><summary>Advanced</summary>${numR("Feed max width","linkedin","feedMaxWidth")}${hkR("linkedin")}</details></details>`;
 
@@ -886,6 +886,37 @@
 
   function initYT(){
     const y=C.youtube;
+
+    if(y.blockAdData)(()=>{
+      const AD_KEYS=["adPlacements","playerAds","adSlots"];
+      let pruned=0;
+      const scrub=(o,d)=>{
+        if(!o||typeof o!=="object"||d>14)return o;
+        if(Array.isArray(o)){
+          for(let i=o.length-1;i>=0;i--){
+            const e=o[i];
+            let isAd=false;
+            try{isAd=!!e?.command?.reelWatchEndpoint?.adClientParams?.isAd;}catch(_){}
+            if(isAd){o.splice(i,1);pruned++;continue;}
+            scrub(e,d+1);
+          }
+          return o;
+        }
+        for(const k of AD_KEYS)if(k in o){try{delete o[k];pruned++;}catch(_){}}
+        for(const k in o){if(Object.prototype.hasOwnProperty.call(o,k))scrub(o[k],d+1);}
+        return o;
+      };
+      const guard=r=>{try{return scrub(r,0);}catch(_){return r;}};
+      try{
+        const nat=JSON.parse;
+        JSON.parse=function(...a){return guard(nat.apply(this,a));};
+      }catch(_){}
+      try{
+        const nrj=Response.prototype.json;
+        Response.prototype.json=function(...a){return nrj.apply(this,a).then(guard);};
+      }catch(_){}
+      window.__wcAdPruned=()=>pruned;
+    })();
     const SEL={ban:"#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,ytm-companion-slot,ytm-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",feed:"ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytd-search-pyv-renderer,ytm-companion-slot,ytm-companion-ad-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer,ad-disclosure-banner-view-model",wrap:"ytd-rich-item-renderer,ytd-rich-section-renderer,ytd-item-section-renderer,ytm-rich-item-renderer,ytm-rich-section-renderer,ytm-item-section-renderer,ytm-media-item",skip:".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-ad-slot button",clos:".ytp-ad-overlay-close-button,.ytp-ad-overlay-close-container button",adui:".ytp-ad-player-overlay,.ytp-ad-player-overlay-layout,.ytp-ad-player-overlay-instream-info,.ytp-ad-preview-container,.ytp-ad-badge,.ytp-ad-simple-ad-badge,.ytp-ad-duration-remaining,.ytp-ad-persistent-progress-bar,.ytp-ad-progress,.ytp-ad-skip-button-container"};
     const YT_MARKS=["sponsored","promoted","includespaidpromotion"];
     const AD_V=["ad-showing","ad-interrupting"],AD_S=["ad-showing","ad-interrupting"];
