@@ -656,9 +656,20 @@
       onReady(nudge);interceptNav(nudge);
     }
 
-    let muted=false,lastShort=0;
+    let muted=false,lastShort=0,adTicks=0;
     const _dismissedEnf=new WeakSet();
-    interceptNav(()=>{lastShort=0;});
+    interceptNav(()=>{lastShort=0;adTicks=0;});
+
+    function tap(el){
+      try{el.click();}catch(_){}
+      const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+      const o={bubbles:true,cancelable:true,composed:true,clientX:cx,clientY:cy,view:window};
+      const P=(t)=>{try{el.dispatchEvent(new PointerEvent(t,{...o,pointerType:"touch",isPrimary:true,pointerId:1}));}catch(_){}};
+      const M=(t)=>{try{el.dispatchEvent(new MouseEvent(t,o));}catch(_){}};
+      const T=(t)=>{try{el.dispatchEvent(new TouchEvent(t,{bubbles:true,cancelable:true}));}catch(_){}};
+      P("pointerdown");T("touchstart");M("mousedown");
+      P("pointerup");T("touchend");M("mouseup");M("click");
+    }
 
     function tick(){
       if(!y.enabled)return;
@@ -677,8 +688,16 @@
           const pl=q("#movie_player,.html5-video-player"),v=q(".html5-video-player video")||q("video");
           const adUiPresent=!!q(SEL.skip)||!!q(SEL.adui);
           const adActive=(hasC(pl,AD_V)||adPresenting(pl))&&adUiPresent;
-          if(adActive){const sk=q(SEL.skip);if(sk)sk.click();if(v){if(y.muteAds&&!v.muted){v.muted=true;muted=true;}if(!sk&&isFinite(v.duration)&&v.duration>1)v.currentTime=v.duration-.1;}q(SEL.clos)?.click();}
-          else if(v&&muted){v.muted=false;muted=false;}
+          if(adActive){
+            adTicks++;
+            const sk=q(SEL.skip);if(sk)tap(sk);
+            if(v){
+              if(y.muteAds&&!v.muted){v.muted=true;muted=true;}
+              if(isFinite(v.duration)&&v.duration>1&&(!sk||adTicks>=3))v.currentTime=v.duration-.1;
+            }
+            q(SEL.clos)?.click();
+          }
+          else{adTicks=0;if(v&&muted){v.muted=false;muted=false;}}
         }
         if(y.skipShortsAds&&/^\/shorts/.test(location.pathname)){
           const sp=q("#shorts-player")||q("#movie_player,.html5-video-player");
