@@ -84,6 +84,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.9.1
+
+- **Fixed: Shorts skipped genuine videos at random.** `AD_S` included `ad-created`, but that class means "an ad player was constructed", not "an ad is playing" — it stays on the player afterwards. Paired with a preloaded, hidden ad slot satisfying the ad-UI half of the test, the gate fired on ordinary content. Caught live while walking a real Shorts feed: two advances triggered on Shorts reporting `getPresentingPlayerType() === 1`, carrying only `ad-created`. Re-run as an A/B over the same feed, the old gate produced 2 false advances and the corrected gate 0. `ad-created` is gone; `ad-showing` and `ad-interrupting` remain, and the authoritative player API is unaffected.
+- **Verified a live desktop ad break.** Two ads, both caught during the window before YouTube renders its ad UI — the old gate evaluated false there while the fixed one was true from the first frame, and muting engaged where it previously could not. Once the break ended the gate went false and the 282s video played unmuted and unseeked, so the 180s seek guard held.
+- **Verified mobile Shorts structurally.** `#shorts-player` does not exist on mobile — the player is `#movie_player`, so the existing fallback is load-bearing — and no false skip occurred on a normal Short after the fix.
+
 ### 8.9.0
 
 - **New: `Follow suggestions`.** Verified against a live logged-in feed, Facebook no longer labels its recommended posts "Suggested for you" — across a full scroll of that feed the phrase appeared **zero** times. What it does instead is put a bare **Follow** button after the author, giving headers like `Proton · Follow · 7h` and `Turn key narrowboats · Follow · 7h`. No phrase list could catch that, and substring-matching "follow" would be reckless because it also matches *followers*, *following* and any post that merely says "follow me". Detection is therefore element-level: an innermost clickable element inside the post's 130px header band whose visible text is exactly "Follow". Measured live: 8 distinct posts flagged against 57 distinct posts kept, with **no false positives** — the composer, friends' posts, group posts and sponsored posts were all left alone, and no post whose header merely contained the word "follow" was flagged. On by default, switchable in the panel, and localized for the common variants.
