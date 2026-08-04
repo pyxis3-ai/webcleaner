@@ -456,8 +456,8 @@
       if(f.hideComposer)R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
       if(f.hideTopBar)R.push(`${X}[role="banner"],${X}[role="navigation"][aria-label="Facebook"],${X}[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}`,`${X}body{padding-top:0!important}`);
       if(f.hideReelsTrays)R.push(`${X}[aria-label="Stories"],${X}[aria-label="Reels"]{display:none!important}`);
-      if(f.hideComments)R.push(`${X}[role="article"] [aria-label="Comment"],${X}[role="article"] [aria-label^="Comments"]{display:none!important}`);
-      if(f.hideLikeCounts)R.push(`${X}[role="article"] [aria-label*="reaction"]{display:none!important}`);
+      if(f.hideComments)R.push(`${X}[aria-label="Leave a comment"],${X}[aria-label="Comment"],${X}[aria-label^="Comments"],${X}[aria-label^="Comment as"]{display:none!important}`);
+      if(f.hideLikeCounts)R.push(`${X}[aria-label^="Like:"],${X}[aria-label*="reaction"]{display:none!important}`);
       if(f.widenFeed){
         const W=clamp(f.feedMaxWidth,BOUNDS.feedMaxWidth[0],BOUNDS.feedMaxWidth[1]);
         R.push(
