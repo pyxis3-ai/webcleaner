@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.3.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.4.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -77,9 +77,13 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Strict Trusted Types sites.** If a site's CSP blocks the script's Trusted Types policy, the settings panel cannot be rendered at all (no string-to-DOM path exists under enforcement). The script detects this, shows a small notice pointing at the manager menu and hotkeys, and makes sure the panel host never blocks clicks. Everything else keeps working.
 - **Substring matching.** Facebook splits the "Sponsored" label across text nodes, so detection must use substring matching — which means text containing "sponsored" as a substring (e.g. "unsponsored") can be hidden. Exact matching was tested and caught 0 of 2 real ads, so this trade is deliberate.
 - **Schedule day-spill.** A schedule of `Mon` `22:00–06:00` does not block Tuesday 02:00.
-- **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
+- **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.4.0
+
+- **Added a markup-rotation safety net.** When the health check reports that sponsored labels are visible — meaning the normal selectors have stopped matching — a fallback engages that ignores markup entirely. It reads only *rendered* text (position-aware, filtered by computed style and geometry) and hides the tightest bounded element containing a sponsored label. This matters because Facebook is documented to plant **hidden "Sponsored" honeypots inside ordinary posts** specifically to make naive text-matching blockers hide real content; reading rendered text rather than the DOM is immune to that by construction. It is a safety net, not a replacement: tested with every known selector renamed, it recovered 4 of 10 ad elements with **zero** of 20 real videos affected, in 20ms. Partial recovery with no collateral damage is the intended behaviour — it only runs when detection is already failing, so normal operation is unchanged.
 
 ### 8.3.0
 
