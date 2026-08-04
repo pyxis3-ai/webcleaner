@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.5.2
+// @version      8.6.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -49,7 +49,9 @@
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"y"},
     },
     linkedin: {
-      enabled:true, hidePromoted:true, hideSuggested:true, showToggleButton:true,
+      enabled:true, hidePromoted:true, hideSuggested:true,
+      hideTopBar:false, hideLeftRail:true, hideRightRail:true, widenFeed:true, feedMaxWidth:900,
+      showToggleButton:true,
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"l"},
     },
     siteBlocker: {
@@ -363,7 +365,7 @@
 
   const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Seek past ads","seekPastAds"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
 
-  const secLI=()=>`<details data-s=linkedin><summary>💼 LinkedIn ${C.linkedin.enabled?"ON":"OFF"}</summary>${swG("linkedin",[["On","enabled"],["Promoted","hidePromoted"],["Suggested","hideSuggested"],["Button","showToggleButton"]])}<details data-s=li-adv><summary>Advanced</summary>${hkR("linkedin")}</details></details>`;
+  const secLI=()=>`<details data-s=linkedin><summary>💼 LinkedIn ${C.linkedin.enabled?"ON":"OFF"}</summary>${swG("linkedin",[["On","enabled"],["Promoted","hidePromoted"],["Suggested","hideSuggested"],["Top bar","hideTopBar"],["L.rail","hideLeftRail"],["R.rail","hideRightRail"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}<details data-s=li-adv><summary>Advanced</summary>${numR("Feed max width","linkedin","feedMaxWidth")}${hkR("linkedin")}</details></details>`;
 
   const secIO=()=>`<details data-s=io><summary>⚙ Import / Export</summary><div class="r"><span>Export settings</span><button class="hk" data-export>Save file</button></div><div class="fr"><span style="font-size:11px;color:#888">Import settings (paste JSON)</span><textarea class="tx" rows="3" style="resize:vertical" data-import placeholder="Paste exported JSON here…"></textarea><button class="hk" style="margin-top:4px;width:100%" data-importbtn>Import</button></div><div class="r"><span>Reset all to defaults</span><button class="hk" style="color:#f66" data-reset>Reset</button></div></details>`;
 
@@ -861,7 +863,29 @@
   function initLI(){
     const L=C.linkedin;
     if(!L.enabled)document.documentElement.classList.add("li-off");
-    addStyle("li-css","html:not(.li-off) [data-li-h]{display:none!important}");
+    const LR=["html:not(.li-off) [data-li-h]{display:none!important}",
+              "html:not(.li-off) [data-li-rail]{display:none!important}"];
+    if(L.hideTopBar)LR.push("html:not(.li-off) header{display:none!important}");
+    if(L.widenFeed){
+      const W=clamp(L.feedMaxWidth,500,3000);
+      LR.push(`html:not(.li-off) [data-li-feed]{width:min(${W}px,97vw)!important;max-width:none!important;margin:0 auto!important}`,
+              `html:not(.li-off) [data-li-feed]>*{width:100%!important;max-width:none!important}`);
+    }
+    addStyle("li-css",LR.join("\n"));
+
+    function tagChrome(){
+      const feed=[...document.querySelectorAll("div,main,section")].find(e=>{const r=e.getBoundingClientRect();return r.width>=480&&r.width<=700&&r.height>400;});
+      if(!feed)return;
+      if(L.widenFeed&&feed.getAttribute("data-li-feed")===null)feed.setAttribute("data-li-feed","");
+      const fr=feed.getBoundingClientRect();
+      for(const e of document.querySelectorAll("aside")){
+        if(e.hasAttribute("data-li-rail"))continue;
+        const r=e.getBoundingClientRect();
+        if(r.height<200||r.width<140||r.width>420)continue;
+        if(L.hideLeftRail&&r.right<=fr.left+12)e.setAttribute("data-li-rail","");
+        else if(L.hideRightRail&&r.left>=fr.right-12)e.setAttribute("data-li-rail","");
+      }
+    }
     const MK=[...(L.hidePromoted?["promoted","sponsored","anzeige","promocionado","sponsorisé","gesponsord"]:[]),
               ...(L.hideSuggested?["suggested","peopleyoumayknow","recommendedforyou"]:[])].map(norm);
     if(!MK.length)return;
@@ -869,6 +893,7 @@
       if(!L.enabled)return;
       const vh=document.documentElement.clientHeight||600;
       const lo=280,hi=Math.max(innerWidth*0.9,700);
+      tagChrome();
       let hid=0;
       for(const el of document.querySelectorAll("div,article,section,li")){
         if(hid>=15)break;

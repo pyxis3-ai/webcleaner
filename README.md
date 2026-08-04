@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.5.2** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.6.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -19,7 +19,7 @@ Each module runs inside its own error boundary, so one site's redesign breaking 
 | **Facebook Clean Feed** | Hides Sponsored posts, Suggested, People-you-may-know, Stories and Reels trays, both sidebars, the composer and the top bar. Auto-skips sponsored Reels. Strips UTM/tracking parameters and unwraps `l.php` redirects. Widens the feed into the space freed by the hidden sidebars. Forces the chronological "Most Recent" feed. Works on desktop **and** mobile web. |
 | **YouTube Skip Ads** | Auto-skips and mutes video ads, skips sponsored Shorts, hides feed/banner/overlay ads, dismisses the anti-adblock popup. Optional distraction-free watch page: hide recommendations, comments, chips, merch/promo shelves and live chat, with the player widened into the reclaimed space. Desktop, `m.youtube.com` and YouTube Music. |
 | **Site Blocker** | Adult filter (on by default) plus an opt-in "Focus Pack" of distracting sites, custom block/allow lists, a schedule window, and a snooze. |
-| **LinkedIn** | Hides Promoted posts and Suggested content in the feed. Uses no CSS selectors — LinkedIn hashes its class names — so it matches on rendered text instead. |
+| **LinkedIn** | Hides Promoted posts and Suggested content, plus the top bar and both side rails, and widens the feed into the reclaimed space. Uses no CSS selectors — LinkedIn hashes its class names — so it matches on rendered text and identifies rails by geometry. |
 | **View Mode Switcher** | Force Desktop or Mobile rendering per site, with an optional centred phone-width frame on desktop. |
 
 Everything is configurable from one in-page panel — open **⚙ Web Cleaner** from your userscript-manager menu, or tap the 🧼 button.
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.6.0
+
+- **LinkedIn brought to parity with Facebook and YouTube.** Added `Top bar`, `L.rail`, `R.rail` and `Widen feed` (with a `Feed max width` under Advanced), alongside the existing Promoted and Suggested toggles. LinkedIn hashes its class names, so the rails are identified by geometry relative to the feed column rather than by selector — the same approach Facebook uses for its left nav. Verified on a live feed with a clean baseline: both rails tagged (216px left, 312px right), both hidden, top bar hidden, feed widened 552 → 900px, and feed content intact. All three site modules now have identical wiring — panel section, GM menu entry, hotkey, cluster button, `affects()` handling and enabled-toggle branch.
 
 ### 8.5.2
 
