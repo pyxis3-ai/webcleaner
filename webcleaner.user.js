@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.5.0
+// @version      8.5.1
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -228,15 +228,15 @@
     for(const el of document.querySelectorAll("div,article,section,li")){
       if(hid>=(maxHide||12))break;
       if(el.__rq)continue;
+      const fits=rr=>rr.width>=lo&&rr.width<=hi&&rr.height>=70&&rr.height<=Math.max(vh*1.6,900)&&rr.bottom>=-400&&rr.top<=vh+400;
       const r=el.getBoundingClientRect();
-      if(r.width<lo||r.width>hi||r.height<70||r.height>Math.max(vh*1.6,900))continue;
-      if(r.bottom<-400||r.top>vh+400)continue;
+      if(!fits(r))continue;
       const txt=visText(el,400);
       if(!txt||!marks.some(m=>txt.includes(m)))continue;
       let tighter=false;
       for(const c of el.children){
         const cr=c.getBoundingClientRect();
-        if(cr.width<lo||cr.height<70)continue;
+        if(!fits(cr))continue;
         const ct=visText(c,300);
         if(ct&&marks.some(m=>ct.includes(m))){tighter=true;break;}
       }
@@ -651,15 +651,15 @@
       const vh=innerHeight,lim=Math.min(560,innerWidth*0.55);
       for(const el of scope.querySelectorAll("div,a")){
         if(el._wc)continue;
+        const fits=rr=>rr.width>=120&&rr.width<=lim&&rr.height>=80&&rr.height<=620&&rr.bottom>=-500&&rr.top<=vh+500;
         const r=el.getBoundingClientRect();
-        if(r.width<120||r.width>lim||r.height<80||r.height>620)continue;
-        if(r.bottom<-500||r.top>vh+500)continue;
+        if(!fits(r))continue;
         const raw=norm(el.textContent||"");
         if(!raw||!MARKS.some(m=>raw.includes(m)))continue;
         let tighter=false;
         for(const c of el.children){
           const cr=c.getBoundingClientRect();
-          if(cr.width<120||cr.height<80)continue;
+          if(!fits(cr))continue;
           if(MARKS.some(m=>norm(c.textContent||"").includes(m))){tighter=true;break;}
         }
         if(tighter)continue;
@@ -874,14 +874,14 @@
         if(hid>=15)break;
         if(el._li)continue;
         const r=el.getBoundingClientRect();
-        if(r.width<lo||r.width>hi||r.height<100||r.height>Math.max(vh*2,1400))continue;
-        if(r.bottom<-500||r.top>vh+500)continue;
+        const fits=rr=>rr.width>=lo&&rr.width<=hi&&rr.height>=100&&rr.height<=Math.max(vh*2,1400)&&rr.bottom>=-500&&rr.top<=vh+500;
+        if(!fits(r))continue;
         const txt=visText(el,400);
         if(!txt||!MK.some(m=>txt.includes(m)))continue;
         let tighter=false;
         for(const c of el.children){
           const cr=c.getBoundingClientRect();
-          if(cr.width<lo||cr.height<100)continue;
+          if(!fits(cr))continue;
           const ct=visText(c,300);
           if(ct&&MK.some(m=>ct.includes(m))){tighter=true;break;}
         }
