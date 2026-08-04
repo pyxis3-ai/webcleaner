@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.0.0
+// @version      8.1.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -65,7 +65,7 @@
 
   const PFX  = "wc7_";
   const gmOk = typeof GM_getValue==="function" && typeof GM_setValue==="function";
-  const gGet = (k,d) => { if(gmOk){const v=GM_getValue(PFX+k,"__M__");if(v!=="__M__")return v;} try{const r=localStorage.getItem(PFX+k);return r===null?d:JSON.parse(r);}catch(_){return d;} };
+  const gGet = (k,d) => { if(gmOk)try{const v=GM_getValue(PFX+k,"__M__");if(v!=="__M__")return v;}catch(_){} try{const r=localStorage.getItem(PFX+k);return r===null?d:JSON.parse(r);}catch(_){return d;} };
   const gSet = (k,v) => { if(gmOk)try{GM_setValue(PFX+k,v);}catch(_){} try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(_){} };
 
   function deepMerge(d,o) {
@@ -131,7 +131,7 @@
 
   const addStyle=(id,css,root)=>{
     const p=root||document.head||document.documentElement;
-    if(p.querySelector?.(`#${id}`)) return;
+    if(root?root.querySelector?.(`#${id}`):document.getElementById(id)) return;
     const s=mk("style",{id}); s.textContent=css; p.appendChild(s);
   };
 
