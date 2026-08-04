@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.2.4** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.3.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -52,7 +52,7 @@ Site Blocker deliberately has no floating button — it matches every page on th
 - **Distraction-free watch page.** `Related`, `Comments`, `Chips`, `Merch/promos` and `Live chat` each hide that part of the YouTube watch page. `Related` is ON by default; with `Widen player` the video expands into the reclaimed space (measured 996×560 → 1385×779 at 1440px).
 - **Facebook mobile.** A logged-in phone is served the responsive `www.facebook.com`, *not* `m.facebook.com`, so the module picks its code path by inspecting the markup rather than the hostname. If something slips through, add markers under **Extra junk phrases**.
 - **Site Blocker** needs Tampermonkey or Violentmonkey (GM storage + menu). The snooze applies to every filter, adult included. For comprehensive adult blocking across all browsers and apps, pair it with a DNS family filter (Cloudflare `1.1.1.3` or NextDNS) — a userscript can't enumerate the whole category.
-- **YouTube ads** are skipped after they're requested. For network-level blocking, pair with uBlock Origin. Note that YouTube deliberately serves playback errors ("Something went wrong. Refresh or try again later.") to users it detects as ad-blocking — if you see that repeatedly, it is usually a network-level blocker being detected, not this script. Toggling **Anti-AB** off will show you YouTube's real message.
+- **YouTube ads** are skipped after they're requested. YouTube's detection reportedly looks for ad slots that loaded but never played and for timing anomalies — which is what seeking past an unskippable ad looks like. See `Seek past ads` in the changelog if you hit playback errors. Note also that full uBlock Origin is disabled on stable Chrome since v138 and its store listing is removed on 31 August 2026, so a Chrome + uBlock pairing is ending; desktop Firefox remains the capable option. For network-level blocking, pair with uBlock Origin. Note that YouTube deliberately serves playback errors ("Something went wrong. Refresh or try again later.") to users it detects as ad-blocking — if you see that repeatedly, it is usually a network-level blocker being detected, not this script. Toggling **Anti-AB** off will show you YouTube's real message.
 
 ### Facebook surface coverage
 
@@ -80,6 +80,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
 
 ## Changelog
+
+### 8.3.0
+
+- **Added `Seek past ads`, and a note on why you might turn it off.** When an ad has no working skip button the script seeks the player to the end. That is the most effective way to clear an unskippable ad, but it is also the exact signature YouTube's detection is described as looking for — an ad slot that loaded but never played, with an impossible timing profile. If you get repeated "Something went wrong" playback errors on videos with unskippable ads, switch **Seek past ads** off: skipping, muting and all feed/banner hiding keep working, and unskippable ads simply play muted instead of being jumped. On by default, because skipping ads is the point.
 
 ### 8.2.4
 

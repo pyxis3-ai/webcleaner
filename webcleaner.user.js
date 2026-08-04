@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.2.4
+// @version      8.3.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -43,7 +43,7 @@
       hideBanners:true, muteAds:true, dismissAntiAdblock:true, hideShorts:false,
       hideEndCards:true, hideInfoCards:true, hideAutoplay:false,
       hideRelated:true, hideComments:false, hideChips:true, hideMerch:true,
-      hideLiveChat:false, widenPlayer:true,
+      hideLiveChat:false, widenPlayer:true, seekPastAds:true,
       showToggleButton:true,
       toggleHotkey:{ctrl:false,alt:true,shift:true,key:"y"},
     },
@@ -310,7 +310,7 @@
 
   const secFB=()=>`<details data-s=facebook><summary>🧹 FB ${C.facebook.enabled?"ON":"OFF"}</summary>${swG("facebook",[["On","enabled"],["Sponsored","hideSponsored"],["Suggested","hideSuggested"],["People YMKN","hidePeopleYouMayKnow"],["Reels/Stories","hideReelsTrays"],["Comments","hideComments"],["Video autoplay","hideVideoAutoplay"],["Like counts","hideLikeCounts"],["R.sidebar","hideRightSidebar"],["L.sidebar","hideLeftSidebar"],["Composer","hideComposer"],["Top bar","hideTopBar"],["Tracking","stripTracking"],["Reel ads","skipReelsAds"],["Most Recent","forceMostRecent"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}${listBlock("Junk phrases","facebook","extraJunkPhrases","phrase")}<details data-s=fb-adv><summary>Advanced</summary>${numR("Feed max width","facebook","feedMaxWidth")}${hkR("facebook")}</details></details>`;
 
-  const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
+  const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Seek past ads","seekPastAds"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
 
   const secIO=()=>`<details data-s=io><summary>⚙ Import / Export</summary><div class="r"><span>Export settings</span><button class="hk" data-export>Save file</button></div><div class="fr"><span style="font-size:11px;color:#888">Import settings (paste JSON)</span><textarea class="tx" rows="3" style="resize:vertical" data-import placeholder="Paste exported JSON here…"></textarea><button class="hk" style="margin-top:4px;width:100%" data-importbtn>Import</button></div><div class="r"><span>Reset all to defaults</span><button class="hk" style="color:#f66" data-reset>Reset</button></div></details>`;
 
@@ -777,7 +777,7 @@
             const sk=q(SEL.skip);if(sk)tap(sk);
             if(v){
               if(y.muteAds&&!v.muted){v.muted=true;muted=true;}
-              if(isFinite(v.duration)&&v.duration>1&&(!sk||adTicks>=3))v.currentTime=v.duration-.1;
+              if(y.seekPastAds&&isFinite(v.duration)&&v.duration>1&&(!sk||adTicks>=3))v.currentTime=v.duration-.1;
             }
             q(SEL.clos)?.click();
           }
