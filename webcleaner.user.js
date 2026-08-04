@@ -175,6 +175,11 @@
 
   const defProp=(obj,key,get)=>{try{Object.defineProperty(obj,key,{configurable:true,get});}catch(_){}};
 
+  const REAL_MOBILE=(()=>{
+    const ua=navigator.userAgent,tp=navigator.maxTouchPoints;
+    return /Mobi|Android|iPhone|iPod|Windows Phone/i.test(ua)||/iPad/.test(ua)||(/Macintosh/.test(ua)&&tp>1)||(navigator.userAgentData?.mobile===true);
+  })();
+
   function applyVMSpoof(){
     const v=C.viewMode;
     const stored=(()=>{try{return localStorage.getItem(PFX+"vm")||"";}catch(_){return"";}})();
@@ -191,8 +196,7 @@
     if(v.spoofMedia){
       const ew=tm?v.mobileWidth:v.desktopWidth,nat=window.matchMedia?.bind(window)??null;
       window.matchMedia=query=>{const s=String(query).toLowerCase();let r=null;const f=val=>{if(r!==false)r=val;};let m;if((m=s.match(/min-width:\s*([\d.]+)px/)))f(ew>=parseFloat(m[1]));if((m=s.match(/max-width:\s*([\d.]+)px/)))f(ew<=parseFloat(m[1]));if(s.includes("pointer: coarse")||s.includes("any-pointer: coarse"))f(tm);if(s.includes("pointer: fine")||s.includes("any-pointer: fine"))f(!tm);if(s.includes("hover: none"))f(tm);if(s.includes("hover: hover"))f(!tm);if(r===null&&nat)return nat(query);return{matches:!!r,media:String(query),onchange:null,addEventListener(){},removeEventListener(){},addListener(){},removeListener(){},dispatchEvent(){return false;}};};
-      const realMobile=/Mobi|Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent)||/iPad/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1)||(navigator.userAgentData?.mobile===true);
-      if(tm&&!realMobile&&v.frameOnDesktop){defProp(window,"innerWidth",()=>v.mobileWidth);defProp(window,"innerHeight",()=>v.mobileHeight);defProp(screen,"width",()=>v.mobileWidth);defProp(screen,"height",()=>v.mobileHeight);defProp(screen,"availWidth",()=>v.mobileWidth);defProp(screen,"availHeight",()=>v.mobileHeight);defProp(window,"devicePixelRatio",()=>v.mobileDpr);}
+      if(tm&&!REAL_MOBILE&&v.frameOnDesktop){defProp(window,"innerWidth",()=>v.mobileWidth);defProp(window,"innerHeight",()=>v.mobileHeight);defProp(screen,"width",()=>v.mobileWidth);defProp(screen,"height",()=>v.mobileHeight);defProp(screen,"availWidth",()=>v.mobileWidth);defProp(screen,"availHeight",()=>v.mobileHeight);defProp(window,"devicePixelRatio",()=>v.mobileDpr);}
     }
   }
   applyVMSpoof();
@@ -238,7 +242,7 @@
   const setVM   =m=>{try{localStorage.setItem(PFX+"vm",m);}catch(_){}location.reload();};
 
   function initVM(){
-    const v=C.viewMode,realMobile=/Mobi|Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent)||/iPad/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1)||(navigator.userAgentData?.mobile===true),useFrame=vmMode==="mobile"&&!realMobile&&v.frameOnDesktop;
+    const v=C.viewMode,useFrame=vmMode==="mobile"&&!REAL_MOBILE&&v.frameOnDesktop;
     let vpLocked=false;
     function applyVP(){if(vmMode==="auto"||vpLocked)return;vpLocked=true;qa('meta[name="viewport"]').forEach(e=>{if(!e.hasAttribute("data-wc"))e.remove();});let m=q('meta[name="viewport"][data-wc]');if(!m){m=mk("meta",{name:"viewport","data-wc":"1"});(document.head||document.documentElement).appendChild(m);}m.setAttribute("content",vmMode==="desktop"?`width=${v.desktopWidth}`:"width=device-width,initial-scale=1,viewport-fit=cover");vpLocked=false;}
     function applyFrame(){if(!useFrame)return;addStyle("vm-frame",`html.vm-f{background:#202124!important;overflow-x:hidden!important}html.vm-f>body{width:${v.mobileWidth}px!important;min-width:${v.mobileWidth}px!important;max-width:${v.mobileWidth}px!important;margin:0 auto!important;min-height:100vh!important;overflow-x:hidden!important;box-shadow:0 0 0 100vmax #202124,0 0 40px rgba(0,0,0,.6)!important}`);document.documentElement.classList.add("vm-f");}
