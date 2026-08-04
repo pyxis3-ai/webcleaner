@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.8.2
+// @version      8.9.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -32,6 +32,7 @@
   const DEF = {
     facebook: {
       enabled:true, hideSponsored:true, hideSuggested:true, hidePeopleYouMayKnow:true,
+      hideFollowSuggestions:true,
       hideReelsTrays:true, hideComments:false, hideVideoAutoplay:true, hideLikeCounts:false,
       stripTracking:true, showToggleButton:true, hideRightSidebar:true, hideLeftSidebar:true,
       hideComposer:true, hideTopBar:true, skipReelsAds:true, forceMostRecent:true,
@@ -472,7 +473,7 @@
 
   const secVM=()=>{const v=C.viewMode,modes=["desktop","mobile","auto"];const seg=(val,attr)=>`<button class="${(attr==="data-vm"?vmMode:v.newSiteDefault)===val?"on":""}" ${attr}="${val}">${val[0].toUpperCase()+val.slice(1)}</button>`;return`<details data-s=vm><summary>🖥 View ${vmMode.toUpperCase()}</summary><div class="r2"><span>Site</span><div class="sg">${modes.map(m=>seg(m,"data-vm")).join("")}</div><span style="margin-left:auto">Def</span><div class="sg">${modes.map(m=>seg(m,"data-df")).join("")}</div></div>${swG("viewMode",[["UA","spoofUA"],["Touch","spoofTouch"],["Media","spoofMedia"],["Reflow CSS","reflowCss"],["Frame","frameOnDesktop"],["Button","showButton"]])}<details data-s=vm-adv><summary>Advanced</summary>${num2("DeskW","viewMode","desktopWidth","MobW","viewMode","mobileWidth")}${num2("MobH","viewMode","mobileHeight","DPR","viewMode","mobileDpr")}${numR("Long-press ms","viewMode","longPressMs")}${txtR("Mobile UA","viewMode","mobileUA")}${txtR("Desktop UA","viewMode","desktopUA")}${hkR("viewMode")}</details></details>`;};
 
-  const secFB=()=>`<details data-s=facebook><summary>🧹 FB ${C.facebook.enabled?"ON":"OFF"}</summary>${swG("facebook",[["On","enabled"],["Sponsored","hideSponsored"],["Suggested","hideSuggested"],["People YMKN","hidePeopleYouMayKnow"],["Reels/Stories","hideReelsTrays"],["Comments","hideComments"],["Video autoplay","hideVideoAutoplay"],["Like counts","hideLikeCounts"],["R.sidebar","hideRightSidebar"],["L.sidebar","hideLeftSidebar"],["Composer","hideComposer"],["Top bar","hideTopBar"],["Tracking","stripTracking"],["Reel ads","skipReelsAds"],["Most Recent","forceMostRecent"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}${listBlock("Junk phrases","facebook","extraJunkPhrases","phrase")}<details data-s=fb-adv><summary>Advanced</summary>${numR("Feed max width","facebook","feedMaxWidth")}${hkR("facebook")}</details></details>`;
+  const secFB=()=>`<details data-s=facebook><summary>🧹 FB ${C.facebook.enabled?"ON":"OFF"}</summary>${swG("facebook",[["On","enabled"],["Sponsored","hideSponsored"],["Suggested","hideSuggested"],["People YMKN","hidePeopleYouMayKnow"],["Follow suggestions","hideFollowSuggestions"],["Reels/Stories","hideReelsTrays"],["Comments","hideComments"],["Video autoplay","hideVideoAutoplay"],["Like counts","hideLikeCounts"],["R.sidebar","hideRightSidebar"],["L.sidebar","hideLeftSidebar"],["Composer","hideComposer"],["Top bar","hideTopBar"],["Tracking","stripTracking"],["Reel ads","skipReelsAds"],["Most Recent","forceMostRecent"],["Widen feed","widenFeed"],["Button","showToggleButton"]])}${listBlock("Junk phrases","facebook","extraJunkPhrases","phrase")}<details data-s=fb-adv><summary>Advanced</summary>${numR("Feed max width","facebook","feedMaxWidth")}${hkR("facebook")}</details></details>`;
 
   const secYT=()=>`<details data-s=youtube><summary>⏭ YT ${C.youtube.enabled?"ON":"OFF"}</summary>${swG("youtube",[["On","enabled"],["Video ads","skipVideoAds"],["Shorts ads","skipShortsAds"],["Feed ads","hideFeedAds"],["Banners","hideBanners"],["Mute ads","muteAds"],["Anti-AB","dismissAntiAdblock"],["Hide Shorts","hideShorts"],["End cards","hideEndCards"],["Info cards","hideInfoCards"],["Autoplay","hideAutoplay"],["Related","hideRelated"],["Comments","hideComments"],["Chips","hideChips"],["Merch/promos","hideMerch"],["Live chat","hideLiveChat"],["Widen player","widenPlayer"],["Seek past ads","seekPastAds"],["Button","showToggleButton"]])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
 
@@ -714,6 +715,20 @@
 
     const isJunk=c=>MARKS.some(m=>c.includes(m))||EXACT.includes(c);
 
+    const FOLLOW=new Set(["follow","seguir","suivre","folgen","segui","volgen","takip et","följ","følg","obserwuj","متابعة","подписаться","フォロー","팔로우","关注","關注"].map(norm));
+    function hasFollowBtn(post,top){
+      if(!f.hideFollowSuggestions)return false;
+      for(const e of post.querySelectorAll('span,a,div[role="button"]')){
+        const t=(e.textContent||"").trim();
+        if(!t||t.length>14||!FOLLOW.has(norm(t)))continue;
+        if(e.querySelector("span,a,div"))continue;
+        const r=e.getBoundingClientRect();
+        if(!r.width||!r.height||r.top<top-4||r.top>top+130)continue;
+        return true;
+      }
+      return false;
+    }
+
     let _feed=null,_skipEl=null,_skipN=0;
     interceptNav(()=>{_feed=null;_skipEl=null;_skipN=0;});
 
@@ -754,7 +769,7 @@
         const r=st.getBoundingClientRect();
         if(r.height<60||r.bottom<-500||r.top>vh+500)continue;
         const hdr=readText(st,r.top-2,r.top+130);if(!hdr)continue;
-        if(isJunk(norm(hdr))||(f.hideReelsTrays&&st.querySelectorAll('a[href*="/reel/"]').length>3)){st.setAttribute("data-fcf","");st._wc="h";}
+        if(isJunk(norm(hdr))||hasFollowBtn(st,r.top)||(f.hideReelsTrays&&st.querySelectorAll('a[href*="/reel/"]').length>3)){st.setAttribute("data-fcf","");st._wc="h";}
         else if((st._wcN=(st._wcN||0)+1)>=6)st._wc="c";
       }
     }
@@ -806,6 +821,7 @@
           const t=norm(raw);if(!t)continue;
           if(MARKS.some(m=>t.includes(m))||EXACT.includes(t))junk=true;
         }
+        if(!junk&&hasFollowBtn(p,p.getBoundingClientRect().top))junk=true;
         if(junk){p.setAttribute("data-fcf","");p._wc="h";}
         else if((p._wcN=(p._wcN||0)+1)>=6)p._wc="c";
       }
