@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.6.7
+// @version      8.7.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -907,8 +907,12 @@
       let hid=0;
       for(const el of document.querySelectorAll("div,article,section,li")){
         if(hid>=15)break;
-        if(el._li)continue;
         if(_liFeed&&(el===_liFeed||el.contains(_liFeed)))continue;
+        const sig=(el.textContent||"").length;
+        if(el._li){
+          if(el._lisig===sig)continue;
+          el._li=0;el.removeAttribute("data-li-h");
+        }
         const r=el.getBoundingClientRect();
         const fits=rr=>rr.width>=lo&&rr.width<=hi&&rr.height>=100&&rr.height<=Math.max(vh*2,1400)&&rr.bottom>=-500&&rr.top<=vh+500;
         if(!fits(r))continue;
@@ -922,7 +926,7 @@
           if(ct&&MK.some(m=>ct.includes(m))){tighter=true;break;}
         }
         if(tighter)continue;
-        el._li=1;el.setAttribute("data-li-h","");hid++;
+        el._li=1;el._lisig=sig;el.setAttribute("data-li-h","");hid++;
       }
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame;

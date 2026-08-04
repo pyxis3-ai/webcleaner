@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.6.7** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.7.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.7.0
+
+- **Fixed the "works sometimes" behaviour on LinkedIn.** LinkedIn virtualises its feed, recycling DOM nodes for different posts as you scroll. The module marked each element it had examined with a permanent flag, so once a node had been checked it was skipped forever — and when LinkedIn reused that node for a *different* post containing an ad, the ad was never examined. That is why filtering appeared to work on some posts and not others, and why results differed between sessions. Elements are now re-examined whenever their content changes, and an element that was hidden but no longer matches is released. Facebook already worked this way; LinkedIn did not.
 
 ### 8.6.7
 
