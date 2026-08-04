@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.6.1
+// @version      8.6.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -888,12 +888,12 @@
     }
     const MK=[...(L.hidePromoted?["promoted","sponsored","anzeige","promocionado","sponsorisé","gesponsord"]:[]),
               ...(L.hideSuggested?["suggested","peopleyoumayknow","recommendedforyou"]:[])].map(norm);
-    if(!MK.length)return;
     function sweepLI(){
       if(!L.enabled)return;
       const vh=document.documentElement.clientHeight||600;
       const lo=280,hi=Math.max(innerWidth*0.9,700);
       tagChrome();
+      if(!MK.length)return;
       let hid=0;
       for(const el of document.querySelectorAll("div,article,section,li")){
         if(hid>=15)break;

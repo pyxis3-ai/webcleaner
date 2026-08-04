@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.6.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.6.2** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.6.2
+
+- **Fixed: turning off `Promoted` and `Suggested` also disabled rail hiding and feed widening.** Those are independent features, but an early return sat between the stylesheet being installed and the sweep being wired — and the sweep is what tags the rails and feed column. So with both post filters off, the chrome settings silently did nothing. The chrome tagging now runs regardless; only the promoted-post scan is gated on having markers.
 
 ### 8.6.1
 
