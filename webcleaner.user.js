@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.6.4
+// @version      8.6.6
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -879,14 +879,10 @@
       for(const e of document.querySelectorAll("div,main,section")){
         const r=e.getBoundingClientRect();
         if(r.width<380||r.width>fhi||r.height<400)continue;
-        let posts=0;
-        for(const c of e.children){
-          const cr=c.getBoundingClientRect();
-          if(cr.height>=150&&cr.width>=r.width*0.8)posts++;
-        }
-        if(posts>=2&&posts>fscore){fscore=posts;feed=e;}
+        if((e.innerText||"").length<500)continue;
+        if(!feed||r.width<feed.getBoundingClientRect().width){fscore=1;feed=e;}
       }
-      if(fscore<2)feed=null;
+      if(!fscore)feed=null;
       if(!feed)return;
       if(L.widenFeed&&feed.getAttribute("data-li-feed")===null)feed.setAttribute("data-li-feed","");
       const fr=feed.getBoundingClientRect();

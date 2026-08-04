@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.6.4** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.6.6** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -82,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.6.6
+
+- **LinkedIn feed detection rewritten against the live DOM, and tested there.** 8.6.3 through 8.6.5 each guessed at how to identify the feed column and each was wrong: by width (matched a page wrapper and squeezed the feed), then by counting post-shaped children (matched an empty skeleton placeholder with three children and zero text, while the real feed has only one such child). Measuring the live page showed the reliable signal is simply text: the feed is the **narrowest column at least 380px wide that contains real text**. Verified live end to end — the 552px feed is selected over both the 1128px wrapper and the empty skeleton, both rails are hidden, the feed stays visible with all its content, and widens 550 → 900px.
 
 ### 8.6.4
 
