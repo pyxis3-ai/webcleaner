@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.2.3** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.2.4** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -80,6 +80,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
 
 ## Changelog
+
+### 8.2.4
+
+- **Fixed: `hideAutoplay` stopped working after the first video.** Disabling YouTube's autoplay toggle was wired to page load only, but YouTube navigates client-side, so it never ran again once you moved to another video. Every other per-navigation concern in the module was already hooked to navigation; this one was the exception. Now re-applied on each navigation.
 
 ### 8.2.3
 

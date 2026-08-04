@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.2.3
+// @version      8.2.4
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -730,7 +730,8 @@
 
     if(y.hideAutoplay){
       const disableAP=()=>{const ap=q(".ytp-autonav-toggle-button");if(ap&&ap.getAttribute("aria-checked")==="true")ap.click();};
-      onReady(disableAP);
+      const apNudge=()=>[0,600,1800].forEach(t=>setTimeout(disableAP,t));
+      onReady(apNudge);interceptNav(apNudge);
     }
 
     if(y.hideRelated&&y.widenPlayer){
