@@ -54,6 +54,22 @@ Site Blocker deliberately has no floating button — it matches every page on th
 - **Site Blocker** needs Tampermonkey or Violentmonkey (GM storage + menu). The snooze applies to every filter, adult included. For comprehensive adult blocking across all browsers and apps, pair it with a DNS family filter (Cloudflare `1.1.1.3` or NextDNS) — a userscript can't enumerate the whole category.
 - **YouTube ads** are skipped after they're requested. For network-level blocking, pair with uBlock Origin. Note that YouTube deliberately serves playback errors ("Something went wrong. Refresh or try again later.") to users it detects as ad-blocking — if you see that repeatedly, it is usually a network-level blocker being detected, not this script. Toggling **Anti-AB** off will show you YouTube's real message.
 
+### Facebook surface coverage
+
+Verified against a live logged-in session. "Feed model" means posts are a vertical list whose header carries the label; "tile grid" means a grid of cards, which the current detector does not model.
+
+| Surface | Mobile | Desktop | Notes |
+|---|---|---|---|
+| Main feed | ✅ | ✅ | Verified: sponsored, Suggested, People-you-may-know, Reels/Stories trays |
+| Reels | ✅ | ✅ | Skips sponsored reels and advances. Mobile was broken before 8.2.2 |
+| Watch | ✅ | ✅ | Facebook now redirects `/watch` to `/reel/`, so Reels handling covers it |
+| Groups feed & individual groups | ✅ | ✅ | Verified: container found, post headers read correctly |
+| Marketplace | ✅ | ❌ | Mobile is covered by the mobile matcher. Desktop is a **tile grid**, so the row-header model finds nothing — a known gap, see below |
+| Stories viewer | ❌ | ❌ | Not covered. The Stories *tray* on the feed is hidden by `Reels/Stories` |
+| Search, Videos, Events, Gaming, Profile | ❌ | ❌ | Not covered |
+
+**Known gap — desktop Marketplace.** Sponsored listings appear there, but Marketplace lays out horizontal rows of tiles rather than a list of posts, so reading each row's header band returns nothing. Covering it properly needs per-tile detection, which is a different model rather than a path addition — adding `/marketplace` to the path gate was tested and does nothing. Mobile Marketplace is unaffected because the mobile matcher works per post node.
+
 ## Limits — what it cannot do
 
 - **Server-side ad stitching.** YouTube bakes some ads into the video stream itself. No client-side script can remove those.
