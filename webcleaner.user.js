@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.2.1
+// @version      8.2.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -503,8 +503,8 @@
       if(f.hideComposer)R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
       if(f.hideTopBar)R.push(`${X}[role="banner"],${X}[role="navigation"][aria-label="Facebook"],${X}[role="navigation"][aria-label="Account Controls and Settings"]{display:none!important}`,`${X}body{padding-top:0!important}`);
       if(f.hideReelsTrays)R.push(`${X}[aria-label="Stories"],${X}[aria-label="Reels"]{display:none!important}`);
-      if(f.hideComments)R.push(`${X}[aria-label="Leave a comment"],${X}[aria-label="Comment"],${X}[aria-label^="Comments"],${X}[aria-label^="Comment as"]{display:none!important}`);
-      if(f.hideLikeCounts)R.push(`${X}[aria-label^="Like:"],${X}[aria-label*="reaction"]{display:none!important}`);
+      if(f.hideComments)R.push(`${X}[aria-label="Leave a comment"],${X}[aria-label^="Comment"]{display:none!important}`);
+      if(f.hideLikeCounts)R.push(`${X}[aria-label^="Like:"],${X}[aria-label*="reaction"],${X}[aria-label*="reacted"]{display:none!important}`);
       if(f.widenFeed){
         const W=clamp(f.feedMaxWidth,BOUNDS.feedMaxWidth[0],BOUNDS.feedMaxWidth[1]);
         R.push(
@@ -666,7 +666,8 @@
         if(f.stripTracking)cleanLinks();
         document.documentElement.classList.toggle("fcf-s",isFeed());
         processMobile();
-        if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();handleReels();}
+        handleReels();
+        if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();}
       }catch(_){}
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame,schedule=()=>{if(!sch){sch=true;idle(()=>{sch=false;sweep();});}};

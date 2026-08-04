@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.2.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.2.2** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -66,6 +66,11 @@ Site Blocker deliberately has no floating button — it matches every page on th
 - **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
 
 ## Changelog
+
+### 8.2.2
+
+- **Fixed: sponsored Reels were never skipped on mobile.** `handleReels()` sat inside the `hasDesktopShell()` branch of the sweep, and mobile Facebook has no `[role="main"]`, so it never ran. The reel machinery itself worked fine on mobile — video, container and skip target all resolve — it was simply gated out. Reels handling is now ungated (it already self-guards on the URL path).
+- **Fixed: `hideComments` did not match on mobile.** Mobile labels comment controls `Comment on reel by X, N comments`, which none of the previous four selectors matched. Broadened to `[aria-label^="Comment"]`, which covers every variant in one rule. `hideLikeCounts` also picks up `reacted`.
 
 ### 8.2.1
 
