@@ -785,7 +785,10 @@
   run(initSB);
   run(initVM);
   onReady(initCluster);
-  if(isFB) run(initFB);
-  if(isYT) run(initYT);
+  const pageBlocked=(()=>{try{return !!blockReason();}catch(_){return false;}})();
+  if(!pageBlocked){
+    if(isFB) run(initFB);
+    if(isYT) run(initYT);
+  }
   regMenu();
 })();
