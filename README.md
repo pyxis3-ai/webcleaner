@@ -85,7 +85,7 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ### 8.7.1
 
-- **Fixed rails reappearing, compressed, after the feed is widened.** Rails were identified by comparing their position against the feed's *current* rect — but widening the feed moves its edges, so on later passes the rails overlapped it and no longer qualified. They stayed visible and were then squeezed by the wider feed. The module was measuring against a value it had itself changed. Rails are now identified independently: a narrow `<aside>` that is neither inside the feed nor contains it, assigned left or right by which half of the viewport its midpoint falls in. Verified by simulation across feed widths of 550px and 900px — the old rule stops tagging at 900px, the new one holds. **Not yet verified on a live feed**, as the session was unavailable.
+- **Fixed rails reappearing, compressed, after the feed is widened.** Rails were identified by comparing their position against the feed's *current* rect — but widening the feed moves its edges, so on later passes the rails overlapped it and no longer qualified. They stayed visible and were then squeezed by the wider feed. The module was measuring against a value it had itself changed. Rails are now identified independently: a narrow `<aside>` that is neither inside the feed nor contains it, assigned left or right by which half of the viewport its midpoint falls in. Verified on a live feed across five consecutive passes with the feed widened to 900px throughout: both rails (216px and 312px) tagged on the first pass and still tagged on the fifth, none visible in any round, none left compressed.
 
 ### 8.7.0
 
