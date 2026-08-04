@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.2.2
+// @version      8.2.3
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -591,6 +591,27 @@
       }
     }
 
+    function processCards(){
+      const scope=q('[role="main"]');if(!scope)return;
+      const vh=innerHeight,lim=Math.min(560,innerWidth*0.55);
+      for(const el of scope.querySelectorAll("div,a")){
+        if(el._wc)continue;
+        const r=el.getBoundingClientRect();
+        if(r.width<120||r.width>lim||r.height<80||r.height>620)continue;
+        if(r.bottom<-500||r.top>vh+500)continue;
+        const raw=norm(el.textContent||"");
+        if(!raw||!MARKS.some(m=>raw.includes(m)))continue;
+        let tighter=false;
+        for(const c of el.children){
+          const cr=c.getBoundingClientRect();
+          if(cr.width<120||cr.height<80)continue;
+          if(MARKS.some(m=>norm(c.textContent||"").includes(m))){tighter=true;break;}
+        }
+        if(tighter)continue;
+        el.setAttribute("data-fcf","");el._wc="h";
+      }
+    }
+
     const MOB_CANDIDATES=[
       "[data-tracking-duration-id]",
       "[data-sigil~='m-feed-voice-subtitle']",
@@ -667,7 +688,7 @@
         document.documentElement.classList.toggle("fcf-s",isFeed());
         processMobile();
         handleReels();
-        if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();}
+        if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();processCards();}
       }catch(_){}
     }
     let sch=false;const idle=window.requestIdleCallback?.bind(window)??requestAnimationFrame,schedule=()=>{if(!sch){sch=true;idle(()=>{sch=false;sweep();});}};

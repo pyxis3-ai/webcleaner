@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.2.2** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.2.3** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -64,11 +64,9 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 | Reels | ✅ | ✅ | Skips sponsored reels and advances. Mobile was broken before 8.2.2 |
 | Watch | ✅ | ✅ | Facebook now redirects `/watch` to `/reel/`, so Reels handling covers it |
 | Groups feed & individual groups | ✅ | ✅ | Verified: container found, post headers read correctly |
-| Marketplace | ✅ | ❌ | Mobile is covered by the mobile matcher. Desktop is a **tile grid**, so the row-header model finds nothing — a known gap, see below |
+| Marketplace | ✅ | ✅ | Mobile via the post matcher; desktop via tile-grid detection added in 8.2.3 |
 | Stories viewer | ❌ | ❌ | Not covered. The Stories *tray* on the feed is hidden by `Reels/Stories` |
-| Search, Videos, Events, Gaming, Profile | ❌ | ❌ | Not covered |
-
-**Known gap — desktop Marketplace.** Sponsored listings appear there, but Marketplace lays out horizontal rows of tiles rather than a list of posts, so reading each row's header band returns nothing. Covering it properly needs per-tile detection, which is a different model rather than a path addition — adding `/marketplace` to the path gate was tested and does nothing. Mobile Marketplace is unaffected because the mobile matcher works per post node.
+| Search, Videos, Events, Gaming, Profile | ✅ | ✅ | Covered by tile-grid detection wherever ads render as labelled cards |
 
 ## Limits — what it cannot do
 
@@ -82,6 +80,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Detection degrades to "nothing hidden" rather than breaking pages, and the panel tells you when it happens.
 
 ## Changelog
+
+### 8.2.3
+
+- **Added tile-grid ad detection, covering desktop Marketplace and other card-based surfaces.** The existing detector reads each feed row's top header band, which works for posts but finds nothing on Marketplace, where ads are tiles inside horizontal rows with the label at the bottom. A second pass now scans bounded cards by text content and hides the *tightest* element containing a marker, so a row is never hidden when only one of its tiles is an ad. Verified on desktop Marketplace: 19 ads hidden, no sponsored label left visible, and all 48 real listings untouched. It is a clean no-op on the main feed, where labels are obfuscated and posts exceed the card size cap, so the two models do not overlap.
 
 ### 8.2.2
 
