@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.6.3
+// @version      8.6.4
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -875,12 +875,18 @@
 
     function tagChrome(){
       const fhi=Math.max(760,Math.min(innerWidth*0.8,1400));
-      let feed=null,fw=0;
+      let feed=null,fscore=0;
       for(const e of document.querySelectorAll("div,main,section")){
         const r=e.getBoundingClientRect();
         if(r.width<380||r.width>fhi||r.height<400)continue;
-        if(r.width>fw){fw=r.width;feed=e;}
+        let posts=0;
+        for(const c of e.children){
+          const cr=c.getBoundingClientRect();
+          if(cr.height>=150&&cr.width>=r.width*0.8)posts++;
+        }
+        if(posts>=2&&posts>fscore){fscore=posts;feed=e;}
       }
+      if(fscore<2)feed=null;
       if(!feed)return;
       if(L.widenFeed&&feed.getAttribute("data-li-feed")===null)feed.setAttribute("data-li-feed","");
       const fr=feed.getBoundingClientRect();
