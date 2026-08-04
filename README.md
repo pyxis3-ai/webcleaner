@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.4.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.5.0** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -10,7 +10,7 @@ A browser userscript for a cleaner, ad-free, more focused web — built and veri
 2. Click **[Install](https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js)** — the manager will prompt you.
 3. Updates are automatic: your manager re-fetches from the URL it was installed from. No re-pasting.
 
-## One script, four modules
+## One script, five modules
 
 Each module runs inside its own error boundary, so one site's redesign breaking a module can't take down the others. Shared plumbing — the draggable button, storage, hotkeys, and the settings panel — is written once.
 
@@ -19,6 +19,7 @@ Each module runs inside its own error boundary, so one site's redesign breaking 
 | **Facebook Clean Feed** | Hides Sponsored posts, Suggested, People-you-may-know, Stories and Reels trays, both sidebars, the composer and the top bar. Auto-skips sponsored Reels. Strips UTM/tracking parameters and unwraps `l.php` redirects. Widens the feed into the space freed by the hidden sidebars. Forces the chronological "Most Recent" feed. Works on desktop **and** mobile web. |
 | **YouTube Skip Ads** | Auto-skips and mutes video ads, skips sponsored Shorts, hides feed/banner/overlay ads, dismisses the anti-adblock popup. Optional distraction-free watch page: hide recommendations, comments, chips, merch/promo shelves and live chat, with the player widened into the reclaimed space. Desktop, `m.youtube.com` and YouTube Music. |
 | **Site Blocker** | Adult filter (on by default) plus an opt-in "Focus Pack" of distracting sites, custom block/allow lists, a schedule window, and a snooze. |
+| **LinkedIn** | Hides Promoted posts and Suggested content in the feed. Uses no CSS selectors — LinkedIn hashes its class names — so it matches on rendered text instead. |
 | **View Mode Switcher** | Force Desktop or Mobile rendering per site, with an optional centred phone-width frame on desktop. |
 
 Everything is configurable from one in-page panel — open **⚙ Web Cleaner** from your userscript-manager menu, or tap the 🧼 button.
@@ -37,6 +38,7 @@ Everything is configurable from one in-page panel — open **⚙ Web Cleaner** f
 | `Alt+Shift+F` | Facebook clean feed — toggle |
 | `Alt+Shift+Y` | YouTube ad-skipping — toggle |
 | `Alt+Shift+B` | Site Blocker — toggle all blocking (works on the block screen too) |
+| `Alt+Shift+L` | LinkedIn — toggle |
 | `Alt+Shift+V` | View Mode — switch Desktop ⇄ Mobile (long-press the button to reset to Auto) |
 
 Shortcuts ignore typing in text fields and never use Cmd/Ctrl.
@@ -80,6 +82,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.5.0
+
+- **Added LinkedIn.** Hides Promoted posts and, optionally, Suggested/recommended content in the feed. Toggle with `Alt+Shift+L`, the 💼 button, or the panel. LinkedIn has moved to fully hashed class names — `feed-shared-update-v2`, `data-urn` and the other long-standing selectors all match nothing now — so this module uses no selectors at all. It reads rendered text and hides the tightest post-sized element containing a Promoted label, the same approach that makes the rotation fallback honeypot-immune. Verified on a live feed: 5 promoted posts hidden with 69 genuine posts untouched. Two promoted units in the narrow right rail are not caught yet, as they fall below the module's minimum card width — main-feed coverage is the goal here.
 
 ### 8.4.0
 
