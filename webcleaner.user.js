@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.3
+// @version      8.11.4
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.3";
+  const VERSION = "8.11.4";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1519,9 +1519,10 @@
         ...f.extraJunkPhrases,
       ].map(norm),
     );
+    const onReelsRoute = () => /^\/reels?(\/|$)/.test(location.pathname);
     function hasFollowBtn(post, top) {
       if (!f.hideFollowSuggestions) return false;
-      const overlaid = !!post.querySelector("video");
+      const overlaid = !!post.querySelector("video") || onReelsRoute();
       for (const e of post.querySelectorAll('span,a,div[role="button"]')) {
         const t = (e.textContent || "").trim();
         if (!t || t.length > 14 || !FOLLOW.has(norm(t))) continue;
@@ -1747,7 +1748,7 @@
     const _reelSt = new WeakMap();
     let _skipT = 0;
     function handleReels() {
-      if (!f.skipReelsAds || !/^\/reels?(\/|$)/.test(location.pathname)) return;
+      if (!f.skipReelsAds || !onReelsRoute()) return;
       const cy = innerHeight / 2;
       let act = null,
         best = 1e9;

@@ -84,6 +84,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.11.4
+
+- **Follow suggestions still showed in Reels on iOS.** `hasFollowBtn` only accepts a Follow button inside a 130px band below the post's top, because in the feed that button belongs to the post header — anything lower is unrelated chrome. 8.11.2 added an exemption for full-bleed media, where the button is overlaid low on the card instead, but it detected that case with `post.querySelector("video")`. On the iOS Reels surface Facebook renders no `<video>` element at all — the reel is a snap-scroll container (`vscroller-snap`) with the media painted elsewhere — so the exemption could never fire. Measured on a real iPhone: every Follow button sat **544–552px** below its own post top with `hasVideoEl:false`, putting all of them outside the band with no exemption available. The exemption now also applies on any `/reel/` or `/reels/` route. Verified that this does not make the feed over-eager: a Follow button 544px deep in an ordinary feed post is still ignored, and only the header-band case is removed there.
+- Reused the new route test in `handleReels`, which duplicated the same expression.
+- Also noted while testing, not yet addressed: `handleReels` selects `video` elements over 200px tall to find the active reel, so on this same iOS Reels UI it finds nothing and the sponsored-reel skip never engages there.
+
 ### 8.11.3
 
 - **Turning the Facebook module off did not stop it deleting posts.** `sweep()` was the only module sweep with no `enabled` check — LinkedIn's `sweepLI` and both YouTube sweeps have always had one. Everything the module hides is normally reversible, because hiding just sets `data-fcf` and the stylesheet is gated on `html:not(.fcf-off)`, so toggling the module off un-hides it again. But the mobile path does not hide: `dropPost` calls `el.remove()`, and no CSS class can bring a removed node back. So with the module switched off, the sweep kept running on every mutation, scroll and 1.2s interval, and permanently destroyed any post it judged to be a suggestion — including false positives the user could no longer inspect. Confirmed on a real iPhone, where the page reported `enabled:false` and `fcf-off` applied, correctly un-hiding all marked nodes, while the in-sweep marker showed the sweep still running. `sweep()` now returns immediately when the module is off.
