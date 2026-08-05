@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.16
+// @version      8.10.17
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.10.16";
+  const VERSION = "8.10.17";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1582,7 +1582,8 @@
       if (el._wcSig !== s) {
         el._wcSig = s;
         el._wcN = 0;
-        if (el._wc === "c") el._wc = null;
+        if (el._wc === "h") el.removeAttribute("data-fcf");
+        el._wc = null;
       }
       return el._wc !== "c";
     }
@@ -1592,8 +1593,8 @@
       if (!fd) return;
       const vh = innerHeight;
       for (const st of fd.children) {
-        if (st._wc === "h") continue;
         if (!recheck(st)) continue;
+        if (st._wc === "h") continue;
         const r = st.getBoundingClientRect();
         if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
         const hdr = readText(st, r.top - 2, r.top + 130);
@@ -1698,8 +1699,8 @@
 
     function processMobile() {
       for (const p of mobilePostNodes()) {
-        if (p._wc === "h") continue;
         if (!recheck(p)) continue;
+        if (p._wc === "h") continue;
         let junk = false;
         for (const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
           const raw = (e.textContent || "").trim();
