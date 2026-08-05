@@ -84,6 +84,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.10.12
+
+- **Fixed a startup crash introduced in 8.10.9 that disabled the whole script for anyone with saved settings.** Enforcing `BOUNDS` inside `deepMerge` referenced `clamp`, but `deepMerge` runs at module load to build the config — about fifty lines before `const clamp` initialises — so the reference hit the temporal dead zone and threw `ReferenceError: Cannot access 'clamp' before initialization`. That line sits at the top level of the script rather than inside an error boundary, so nothing after it ran: no filtering, no view mode, no blocker, no panel. It only triggered when merging a stored value whose key is in `BOUNDS`, which is exactly what the panel writes the moment any setting is touched, since saving persists the whole module object. `clamp` is now a hoisted function declaration.
+- **Why the regression suite missed it, and what changed.** Every test seeded only `wc7_vm`, a plain string, so no run ever merged a stored numeric setting — the suite exercised a first-install profile and never a returning user's. Startup with a realistic stored config is now part of the standard run, alongside a check that the script leaves non-target sites completely alone: across eight unrelated sites it hides nothing, never shows the block screen, never applies the frame or its viewport meta, and raises no page errors, while still rendering its button.
+- Also verified at both ends of `BOUNDS.mobileWidth` — 240 and 1080 both frame correctly with no horizontal overflow and content intact — and with every module disabled, where the script stays inert and hides nothing.
+
 ### 8.10.7
 
 - **Hardened the mobile scans against weak devices.** The two full-document scanners added in 8.10.2/8.10.3 ran once per sweep, and the sweep is driven by a mutation observer over a feed that mutates constantly. Even after the 8.10.5 memoization fix that meant a `querySelectorAll("div")` walk on every frame, which a desktop absorbs and a phone may not — and on a phone a saturated main thread stops the site's own infinite scroll from ever running, so the feed appears to stall after the first couple of posts. Both scanners are now behind a 400ms throttle. Measured under a simulated mutation storm on a live logged-in feed at iPhone dimensions: **318 sweeps in 6 seconds, of which 15 ran the scan and 303 skipped it** — 2.5 scans per second, 14.9ms of scanning total, **0.25% of wall-clock time** — with the Stories tray still correctly hidden.

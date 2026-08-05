@@ -228,7 +228,9 @@
     location.reload();
   }
 
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+  }
   const bare = () => location.hostname.replace(/^www\./, "");
   const norm = (s) =>
     String(s)
