@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.1
+// @version      8.11.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.1";
+  const VERSION = "8.11.2";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1521,12 +1521,14 @@
     );
     function hasFollowBtn(post, top) {
       if (!f.hideFollowSuggestions) return false;
+      const overlaid = !!post.querySelector("video");
       for (const e of post.querySelectorAll('span,a,div[role="button"]')) {
         const t = (e.textContent || "").trim();
         if (!t || t.length > 14 || !FOLLOW.has(norm(t))) continue;
         if (e.querySelector("span,a,div")) continue;
         const r = e.getBoundingClientRect();
-        if (!r.width || !r.height || r.top < top - 4 || r.top > top + 130) continue;
+        if (!r.width || !r.height) continue;
+        if (!overlaid && (r.top < top - 4 || r.top > top + 130)) continue;
         return true;
       }
       return false;
