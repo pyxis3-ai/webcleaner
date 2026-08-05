@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.4
+// @version      8.10.5
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -1645,6 +1645,7 @@
     }
 
     let _composerDone = false;
+    const _chromeChecked = new WeakSet();
     function hideMobileChrome() {
       if (f.hideTopBar) for (const tl of document.querySelectorAll('[role="tablist"]:not([data-fcf])')) tl.setAttribute("data-fcf", "");
       if (!f.hideComposer || _composerDone) return;
@@ -1654,7 +1655,10 @@
         vw = innerWidth;
       if (scrollY > limit + 400) return;
       for (const el of document.querySelectorAll("div")) {
+        if (_chromeChecked.has(el)) continue;
         const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) continue;
+        _chromeChecked.add(el);
         if (r.top + scrollY >= limit) continue;
         if (r.width < vw * 0.9 || r.width > vw * 1.02 || r.height < 50 || r.height > 95) continue;
         if (el.closest("[data-fcf]") || el.closest("[data-tracking-duration-id]")) continue;
@@ -1667,12 +1671,11 @@
     const _trayChecked = new WeakSet();
     function hideTrayRows() {
       if (!f.hideReelsTrays) return;
-      const vw = innerWidth,
-        vh = innerHeight;
+      const vw = innerWidth;
       for (const el of document.querySelectorAll("div")) {
         if (_trayChecked.has(el)) continue;
         const r = el.getBoundingClientRect();
-        if (r.bottom < -800 || r.top > vh + 800) continue;
+        if (!r.width || !r.height) continue;
         _trayChecked.add(el);
         if (r.width < vw * 0.9 || r.width > vw * 1.02 || r.height < 150 || r.height > 340) continue;
         if (el.closest("[data-fcf]")) continue;

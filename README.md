@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.10.4** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.10.5** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -83,6 +83,10 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.10.5
+
+- **Fixed a scrolling regression introduced in 8.10.2.** The mobile tray detector memoized elements *after* its viewport-proximity test, not before, so every div outside the viewport band was skipped without ever being recorded — and re-measured with `getBoundingClientRect()` on every sweep, forever. Because the sweep is driven by a `subtree: true` MutationObserver over a feed that mutates constantly while scrolling, this meant a full-document forced synchronous layout on essentially every frame, with a cost that grew as the feed grew. Measured on a live logged-in mobile feed scrolled to 3153 divs: **2846 elements re-measured per sweep at 2.5–3.4ms**, versus **84 at 0.4–0.7ms** after the fix — 34× fewer measurements, and constant rather than growing. The viewport test was never needed for correctness in the first place, since the detector matches on width and height, which do not depend on scroll position; removing it makes the detector both cheaper and able to catch a tray before it scrolls into view. `hideMobileChrome` had the same unbounded shape with no memoization at all, and would rescan every div on every sweep whenever a page had no composer to find, so it now memoizes too. Verified after the fix: still exactly one node tagged and the Stories tray still hidden.
 
 ### 8.10.4
 
