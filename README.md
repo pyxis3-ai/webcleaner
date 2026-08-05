@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.10.6** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.10.7** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -83,6 +83,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.10.7
+
+- **Hardened the mobile scans against weak devices.** The two full-document scanners added in 8.10.2/8.10.3 ran once per sweep, and the sweep is driven by a mutation observer over a feed that mutates constantly. Even after the 8.10.5 memoization fix that meant a `querySelectorAll("div")` walk on every frame, which a desktop absorbs and a phone may not — and on a phone a saturated main thread stops the site's own infinite scroll from ever running, so the feed appears to stall after the first couple of posts. Both scanners are now behind a 400ms throttle. Measured under a simulated mutation storm on a live logged-in feed at iPhone dimensions: **318 sweeps in 6 seconds, of which 15 ran the scan and 303 skipped it** — 2.5 scans per second, 14.9ms of scanning total, **0.25% of wall-clock time** — with the Stories tray still correctly hidden.
+- **On iOS specifically:** the current code could not be made to misbehave at 393×852 with an iOS user agent — 58 post units, 16 hidden by phrase, 2 by Follow, **40 kept visible**, and the same `[data-tracking-duration-id]` markup as Android. Note this is Chrome emulating iOS, not WebKit, so engine-level differences are not covered by it. A feed that stops after two posts on a real iPhone is the signature of the pre-8.10.5 layout-thrash bug rather than of over-hiding, since over-hiding leaves gaps but keeps loading.
 
 ### 8.10.6
 

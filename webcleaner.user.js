@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.6
+// @version      8.10.7
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -1669,6 +1669,13 @@
     }
 
     const _trayChecked = new WeakSet();
+    let _scanAt = 0;
+    const scanDue = () => {
+      const n = Date.now();
+      if (n - _scanAt < 400) return false;
+      _scanAt = n;
+      return true;
+    };
     function hideTrayRows() {
       if (!f.hideReelsTrays) return;
       const vw = innerWidth;
@@ -1822,7 +1829,7 @@
           hideLeftNav();
           if (isClean()) processDesktop();
           processCards();
-        } else if (isFeed()) {
+        } else if (isFeed() && scanDue()) {
           hideTrayRows();
           hideMobileChrome();
         }
