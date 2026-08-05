@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.10
+// @version      8.10.11
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -278,18 +278,22 @@
     };
   })();
 
+  const HOSTNAME = /^[\p{L}\p{N}.-]+$/u;
   function cleanHost(raw) {
-    try {
-      const s = String(raw).trim();
-      return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : "https://" + s).hostname.replace(/^www\./, "").toLowerCase();
-    } catch (_) {
-      return String(raw)
-        .trim()
-        .replace(/^[a-z]+:\/\//i, "")
-        .replace(/[/:?#].*$/, "")
-        .replace(/^www\./, "")
-        .toLowerCase();
-    }
+    const h = (() => {
+      try {
+        const s = String(raw).trim();
+        return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : "https://" + s).hostname.replace(/^www\./, "").toLowerCase();
+      } catch (_) {
+        return String(raw)
+          .trim()
+          .replace(/^[a-z]+:\/\//i, "")
+          .replace(/[/:?#].*$/, "")
+          .replace(/^www\./, "")
+          .toLowerCase();
+      }
+    })();
+    return HOSTNAME.test(h) ? h : "";
   }
 
   const _hotkeys = [];
