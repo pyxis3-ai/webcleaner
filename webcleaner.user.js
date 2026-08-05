@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.4
+// @version      8.11.5
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,10 +127,12 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.4";
-  const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
+  const VERSION = "8.11.5";
+  const GMNS = typeof GM !== "undefined" && GM ? GM : null;
+  const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
+  const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
-    if (gmOk)
+    if (gmLegacy)
       try {
         const v = GM_getValue(PFX + k, "__M__");
         if (v !== "__M__") return v;
@@ -143,14 +145,29 @@
     }
   };
   const gSet = (k, v) => {
-    if (gmOk)
+    if (gmLegacy)
       try {
         GM_setValue(PFX + k, v);
+      } catch (_) {}
+    if (gmModern)
+      try {
+        Promise.resolve(GMNS.setValue(PFX + k, v)).catch(() => {});
       } catch (_) {}
     try {
       localStorage.setItem(PFX + k, JSON.stringify(v));
     } catch (_) {}
   };
+  async function hydrateShared(keys) {
+    if (!gmModern) return;
+    for (const k of keys) {
+      try {
+        const v = await GMNS.getValue(PFX + k, "__M__");
+        if (v === "__M__") continue;
+        const next = JSON.stringify(v);
+        if (localStorage.getItem(PFX + k) !== next) localStorage.setItem(PFX + k, next);
+      } catch (_) {}
+    }
+  }
 
   function deepMerge(d, o) {
     const r = JSON.parse(JSON.stringify(d));
@@ -2379,10 +2396,17 @@
   }
 
   function regMenu() {
-    if (typeof GM_registerMenuCommand !== "function") return;
+    const modern = GMNS && typeof GMNS.registerMenuCommand === "function";
+    const legacy = typeof GM_registerMenuCommand === "function";
+    if (!modern && !legacy) return;
+    const reg = (label, fn) => {
+      try {
+        return modern ? GMNS.registerMenuCommand(label, fn) : GM_registerMenuCommand(label, fn);
+      } catch (_) {}
+    };
     const h = bare();
-    GM_registerMenuCommand("⚙ Web Cleaner", Panel.open);
-    GM_registerMenuCommand(`${C.siteBlocker.enabled ? "⛔ ON" : "✅ OFF"} toggle`, () =>
+    reg("⚙ Web Cleaner", Panel.open);
+    reg(`${C.siteBlocker.enabled ? "⛔ ON" : "✅ OFF"} toggle`, () =>
       applyEdit(
         "siteBlocker",
         () => {
@@ -2391,7 +2415,7 @@
         "block",
       ),
     );
-    GM_registerMenuCommand(`➕ Block ${h}`, () =>
+    reg(`➕ Block ${h}`, () =>
       applyEdit(
         "siteBlocker",
         () => {
@@ -2401,7 +2425,7 @@
         "block",
       ),
     );
-    GM_registerMenuCommand(`➖ Allow ${h}`, () =>
+    reg(`➖ Allow ${h}`, () =>
       applyEdit(
         "siteBlocker",
         () => {
@@ -2411,12 +2435,12 @@
         "block",
       ),
     );
-    if (isFB) GM_registerMenuCommand(`🧹 FB ${C.facebook.enabled ? "ON" : "OFF"}`, () => toggleFB(!C.facebook.enabled));
-    if (isYT) GM_registerMenuCommand(`⏭ YT ${C.youtube.enabled ? "ON" : "OFF"}`, () => toggleYT(!C.youtube.enabled));
-    if (isLI) GM_registerMenuCommand(`💼 LinkedIn ${C.linkedin.enabled ? "ON" : "OFF"}`, () => toggleLI(!C.linkedin.enabled));
-    GM_registerMenuCommand("🖥 Desktop", () => setVM("desktop"));
-    GM_registerMenuCommand("📱 Mobile", () => setVM("mobile"));
-    GM_registerMenuCommand("↺ Auto", () => setVM("auto"));
+    if (isFB) reg(`🧹 FB ${C.facebook.enabled ? "ON" : "OFF"}`, () => toggleFB(!C.facebook.enabled));
+    if (isYT) reg(`⏭ YT ${C.youtube.enabled ? "ON" : "OFF"}`, () => toggleYT(!C.youtube.enabled));
+    if (isLI) reg(`💼 LinkedIn ${C.linkedin.enabled ? "ON" : "OFF"}`, () => toggleLI(!C.linkedin.enabled));
+    reg("🖥 Desktop", () => setVM("desktop"));
+    reg("📱 Mobile", () => setVM("mobile"));
+    reg("↺ Auto", () => setVM("auto"));
   }
 
   const run = (fn) => {
@@ -2440,4 +2464,5 @@
     if (isLI) run(initLI);
   }
   regMenu();
+  hydrateShared(Object.keys(DEF));
 })();
