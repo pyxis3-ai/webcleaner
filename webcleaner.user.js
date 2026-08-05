@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.14
+// @version      8.10.15
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -126,7 +126,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.10.14";
+  const VERSION = "8.10.15";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1599,6 +1599,7 @@
         if (isJunk(norm(hdr)) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
           st.setAttribute("data-fcf", "");
           st._wc = "h";
+          collapseEmptyWrapper(st);
         } else if ((st._wcN = (st._wcN || 0) + 1) >= 6) st._wc = "c";
       }
     }
@@ -1640,6 +1641,27 @@
       return [];
     }
 
+    function collapseEmptyWrapper(el) {
+      let n = el.parentElement;
+      for (let i = 0; i < 4 && n; i++, n = n.parentElement) {
+        if (n === document.body || n.hasAttribute("data-fcf")) return;
+        const r = n.getBoundingClientRect();
+        if (r.height < 40) return;
+        let live = false;
+        for (const c of n.children) {
+          if (c.hasAttribute && c.hasAttribute("data-fcf")) continue;
+          const cr = c.getBoundingClientRect();
+          if (cr.height > 4 && cr.width > 4) {
+            live = true;
+            break;
+          }
+        }
+        if (live) return;
+        if ((n.textContent || "").trim().length > 15) return;
+        n.setAttribute("data-fcf", "");
+      }
+    }
+
     function processMobile() {
       for (const p of mobilePostNodes()) {
         if (p._wc === "h") continue;
@@ -1658,6 +1680,7 @@
         if (junk) {
           p.setAttribute("data-fcf", "");
           p._wc = "h";
+          collapseEmptyWrapper(p);
         } else if ((p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
       }
     }
