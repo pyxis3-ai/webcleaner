@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.0
+// @version      8.11.1
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.0";
+  const VERSION = "8.11.1";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1682,6 +1682,7 @@
       for (const p of mobilePostNodes()) {
         if (!recheck(p)) continue;
         if (p._wc === "h") continue;
+        const r = p.getBoundingClientRect();
         let junk = false;
         for (const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
           const raw = (e.textContent || "").trim();
@@ -1692,9 +1693,9 @@
             break;
           }
         }
-        if (!junk && hasFollowBtn(p, p.getBoundingClientRect().top)) junk = true;
+        if (!junk && r.height && hasFollowBtn(p, r.top)) junk = true;
         if (junk) dropPost(p);
-        else if ((p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
+        else if (r.height && (p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
       }
     }
 
