@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.1
+// @version      8.10.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -827,6 +827,31 @@
       }
     }
 
+    const _trayChecked=new WeakSet();
+    function hideTrayRows(){
+      if(!f.hideReelsTrays)return;
+      const vw=innerWidth,vh=innerHeight;
+      for(const el of document.querySelectorAll("div")){
+        if(_trayChecked.has(el))continue;
+        const r=el.getBoundingClientRect();
+        if(r.bottom<-800||r.top>vh+800)continue;
+        _trayChecked.add(el);
+        if(r.width<vw*0.9||r.width>vw*1.02||r.height<150||r.height>340)continue;
+        if(el.closest("[data-fcf]"))continue;
+        const tops=[];
+        const scan=n=>{
+          for(const c of n.children){
+            const cr=c.getBoundingClientRect();
+            if(cr.width>=80&&cr.width<=170&&cr.height>=130&&cr.height<=300)tops.push(Math.round(cr.top/10));
+            else if(cr.width>170&&c.children.length)scan(c);
+          }
+        };
+        scan(el);
+        if(tops.length<3||new Set(tops).size>2)continue;
+        el.setAttribute("data-fcf","");
+      }
+    }
+
     function hideLeftNav(){
       if(!f.hideLeftSidebar)return;
       for(const n of document.querySelectorAll('[role="navigation"]:not([data-fcf-ln])')){
@@ -873,6 +898,7 @@
         processMobile();
         handleReels();
         if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();processCards();}
+        else if(isFeed())hideTrayRows();
         if(Health.miss>0)rescueSweep(MARKS,"data-fcf",12);
       }catch(_){}
     }
