@@ -84,6 +84,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.11.3
+
+- **Turning the Facebook module off did not stop it deleting posts.** `sweep()` was the only module sweep with no `enabled` check — LinkedIn's `sweepLI` and both YouTube sweeps have always had one. Everything the module hides is normally reversible, because hiding just sets `data-fcf` and the stylesheet is gated on `html:not(.fcf-off)`, so toggling the module off un-hides it again. But the mobile path does not hide: `dropPost` calls `el.remove()`, and no CSS class can bring a removed node back. So with the module switched off, the sweep kept running on every mutation, scroll and 1.2s interval, and permanently destroyed any post it judged to be a suggestion — including false positives the user could no longer inspect. Confirmed on a real iPhone, where the page reported `enabled:false` and `fcf-off` applied, correctly un-hiding all marked nodes, while the in-sweep marker showed the sweep still running. `sweep()` now returns immediately when the module is off.
+- Removed `collapseEmptyWrapper`, dead since the 8.10.18 rollback — declared, never called.
+
 ### 8.10.12
 
 - **Fixed a startup crash introduced in 8.10.9 that disabled the whole script for anyone with saved settings.** Enforcing `BOUNDS` inside `deepMerge` referenced `clamp`, but `deepMerge` runs at module load to build the config — about fifty lines before `const clamp` initialises — so the reference hit the temporal dead zone and threw `ReferenceError: Cannot access 'clamp' before initialization`. That line sits at the top level of the script rather than inside an error boundary, so nothing after it ran: no filtering, no view mode, no blocker, no panel. It only triggered when merging a stored value whose key is in `BOUNDS`, which is exactly what the panel writes the moment any setting is touched, since saving persists the whole module object. `clamp` is now a hoisted function declaration.

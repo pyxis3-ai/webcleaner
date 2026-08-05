@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.2
+// @version      8.11.3
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.2";
+  const VERSION = "8.11.3";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1659,27 +1659,6 @@
       scrollBy(0, -1);
     }
 
-    function collapseEmptyWrapper(el) {
-      let n = el.parentElement;
-      for (let i = 0; i < 4 && n; i++, n = n.parentElement) {
-        if (n === document.body || n.hasAttribute("data-fcf")) return;
-        const r = n.getBoundingClientRect();
-        if (r.height < 40) return;
-        let live = false;
-        for (const c of n.children) {
-          if (c.hasAttribute && c.hasAttribute("data-fcf")) continue;
-          const cr = c.getBoundingClientRect();
-          if (cr.height > 4 && cr.width > 4) {
-            live = true;
-            break;
-          }
-        }
-        if (live) return;
-        if ((n.textContent || "").trim().length > 15) return;
-        n.setAttribute("data-fcf", "");
-      }
-    }
-
     function processMobile() {
       for (const p of mobilePostNodes()) {
         if (!recheck(p)) continue;
@@ -1896,6 +1875,7 @@
     }
 
     function sweep() {
+      if (!f.enabled) return;
       try {
         if (f.stripTracking) cleanLinks();
         document.documentElement.classList.toggle("fcf-s", isFeed());
