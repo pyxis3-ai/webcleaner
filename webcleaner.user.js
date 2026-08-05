@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.18
+// @version      8.10.19
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -125,8 +125,9 @@
     },
   };
 
+  const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.10.18";
+  const VERSION = "8.10.19";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1861,16 +1862,35 @@
       return isFeed() || pp === "/groups/feed" || pp === "/watch" || /^\/groups\/[^/]+$/.test(pp);
     };
     const hasDesktopShell = () => !!q('[role="main"]');
+    function keepScrollAnchored(mutate) {
+      if (!NEEDS_SCROLL_ANCHOR || !scrollY) return mutate();
+      const mid = Math.floor(innerWidth / 2);
+      const marks = [];
+      for (let y = 1; y < Math.min(innerHeight, 400) && marks.length < 6; y += 60) {
+        const el = document.elementFromPoint(mid, y);
+        if (el && el !== document.body && el !== document.documentElement) marks.push([el, el.getBoundingClientRect().top]);
+      }
+      mutate();
+      for (const [el, top] of marks) {
+        if (!el.isConnected) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.height) continue;
+        const d = r.top - top;
+        if (d) scrollBy(0, d);
+        return;
+      }
+    }
+
     function sweep() {
       try {
         if (f.stripTracking) cleanLinks();
         document.documentElement.classList.toggle("fcf-s", isFeed());
-        processMobile();
+        keepScrollAnchored(processMobile);
         handleReels();
         if (hasDesktopShell()) {
           hideLeftNav();
-          if (isClean()) processDesktop();
-          processCards();
+          if (isClean()) keepScrollAnchored(processDesktop);
+          keepScrollAnchored(processCards);
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
           hideMobileChrome();
