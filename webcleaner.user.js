@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.15
+// @version      8.10.16
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -43,6 +43,7 @@
       hideSuggested: true,
       hidePeopleYouMayKnow: true,
       hideFollowSuggestions: true,
+      hideDeadSpace: true,
       hideReelsTrays: true,
       hideComments: false,
       hideVideoAutoplay: true,
@@ -126,7 +127,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.10.15";
+  const VERSION = "8.10.16";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -869,6 +870,7 @@
       ["Suggested", "hideSuggested"],
       ["People YMKN", "hidePeopleYouMayKnow"],
       ["Follow suggestions", "hideFollowSuggestions"],
+      ["Blank gaps", "hideDeadSpace"],
       ["Reels/Stories", "hideReelsTrays"],
       ["Comments", "hideComments"],
       ["Video autoplay", "hideVideoAutoplay"],
@@ -1423,7 +1425,7 @@
 
     (() => {
       const X = "html.fcf-s:not(.fcf-off) ";
-      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}"];
+      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}", "html:not(.fcf-off) [data-fcf-gap]{display:none!important}"];
       if (f.hideRightSidebar) R.push(`${X}[role="complementary"]{display:none!important}`);
       if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`, `html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
       if (f.hideComposer) R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
@@ -1639,6 +1641,38 @@
         if (found.length > 1) return found;
       }
       return [];
+    }
+
+    const _gapSince = new WeakMap();
+    function collapseDeadSpace() {
+      if (!f.hideDeadSpace) return;
+      const vw = innerWidth,
+        vh = innerHeight,
+        now = Date.now();
+      for (const el of document.querySelectorAll("div")) {
+        const tagged = el.hasAttribute("data-fcf-gap");
+        const txt = (el.textContent || "").trim();
+        const empty = txt.length < 15 && !el.querySelector("img,video,canvas,svg,input,textarea,button");
+        if (tagged) {
+          if (!empty) {
+            el.removeAttribute("data-fcf-gap");
+            _gapSince.delete(el);
+          }
+          continue;
+        }
+        if (!empty) continue;
+        const r = el.getBoundingClientRect();
+        if (r.bottom < -vh || r.top > vh * 2) continue;
+        if (r.width < vw * 0.7 || r.height < 200) continue;
+        if (el.closest("[data-fcf],[data-fcf-gap]")) continue;
+        const t0 = _gapSince.get(el);
+        if (!t0) {
+          _gapSince.set(el, now);
+          continue;
+        }
+        if (now - t0 < 1500) continue;
+        el.setAttribute("data-fcf-gap", "");
+      }
     }
 
     function collapseEmptyWrapper(el) {
@@ -1873,6 +1907,7 @@
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
           hideMobileChrome();
+          collapseDeadSpace();
         }
         if (Health.miss > 0) rescueSweep(MARKS, "data-fcf", 12);
       } catch (_) {}
