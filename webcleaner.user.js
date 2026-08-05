@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.19
+// @version      8.11.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,7 +127,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.10.19";
+  const VERSION = "8.11.0";
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -1599,9 +1599,7 @@
         const hdr = readText(st, r.top - 2, r.top + 130);
         if (!hdr) continue;
         if (isJunk(norm(hdr)) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
-          st.setAttribute("data-fcf", "");
-          st._wc = "h";
-          collapseEmptyWrapper(st);
+          dropPost(st);
         } else if ((st._wcN = (st._wcN || 0) + 1) >= 6) st._wc = "c";
       }
     }
@@ -1643,6 +1641,22 @@
       return [];
     }
 
+    let _dropped = 0;
+    function dropPost(el) {
+      try {
+        el.remove();
+      } catch (_) {
+        el.setAttribute("data-fcf", "");
+      }
+      _dropped++;
+    }
+    function settleAfterDrops() {
+      if (!_dropped) return;
+      _dropped = 0;
+      scrollBy(0, 1);
+      scrollBy(0, -1);
+    }
+
     function collapseEmptyWrapper(el) {
       let n = el.parentElement;
       for (let i = 0; i < 4 && n; i++, n = n.parentElement) {
@@ -1679,11 +1693,8 @@
           }
         }
         if (!junk && hasFollowBtn(p, p.getBoundingClientRect().top)) junk = true;
-        if (junk) {
-          p.setAttribute("data-fcf", "");
-          p._wc = "h";
-          collapseEmptyWrapper(p);
-        } else if ((p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
+        if (junk) dropPost(p);
+        else if ((p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
       }
     }
 
@@ -1885,11 +1896,18 @@
       try {
         if (f.stripTracking) cleanLinks();
         document.documentElement.classList.toggle("fcf-s", isFeed());
-        keepScrollAnchored(processMobile);
+        keepScrollAnchored(() => {
+          processMobile();
+          settleAfterDrops();
+        });
         handleReels();
         if (hasDesktopShell()) {
           hideLeftNav();
-          if (isClean()) keepScrollAnchored(processDesktop);
+          if (isClean())
+            keepScrollAnchored(() => {
+              processDesktop();
+              settleAfterDrops();
+            });
           keepScrollAnchored(processCards);
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
