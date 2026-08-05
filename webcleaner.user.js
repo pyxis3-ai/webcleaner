@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.7
+// @version      8.10.8
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -823,7 +823,7 @@
 
   const secSB = () => {
     const s = C.siteBlocker;
-    return `<details data-s=sb open><summary>⛔ Blocker ${s.enabled ? "ON" : "OFF"}</summary><div class="r"><div>${esc(HOST)}</div><label class="sw"><input type="checkbox" data-sw="siteBlocker.enabled"${s.enabled ? " checked" : ""}><span class="tk"></span></label></div>${sw2("Adult", "siteBlocker", "blockAdult", "Focus", "siteBlocker", "blockFocus")}${sw("Schedule (" + esc(s.schedule.from) + "–" + esc(s.schedule.to) + ")", "siteBlocker", "scheduleOn")}${focusState()}${sbSnoozed() ? `<div class="cu snz">⏱ Snoozed — tap cancel</div>` : ""}${listBlock("Blocked", "siteBlocker", "custom", "example.com")}${listBlock("Allowed", "siteBlocker", "allow", "example.com")}<details data-s=focus><summary>Focus (${FOCUS.length})</summary>${packHtml(FOCUS)}</details><details data-s=adult><summary>Adult (${ADULT.length})</summary>${packHtml(ADULT)}</details><details data-s=sb-adv><summary>Advanced</summary>${time2("From", "siteBlocker", "from", "To", "to")}${numR("Snooze min", "siteBlocker", "snoozeMinutes")}${hkR("siteBlocker")}</details></details>`;
+    return `<details data-s=sb open><summary>⛔ Blocker ${s.enabled ? "ON" : "OFF"}</summary>${sw(HOST, "siteBlocker", "enabled")}${sw2("Adult", "siteBlocker", "blockAdult", "Focus", "siteBlocker", "blockFocus")}${sw("Schedule (" + esc(s.schedule.from) + "–" + esc(s.schedule.to) + ")", "siteBlocker", "scheduleOn")}${focusState()}${sbSnoozed() ? `<div class="cu snz">⏱ Snoozed — tap cancel</div>` : ""}${listBlock("Blocked", "siteBlocker", "custom", "example.com")}${listBlock("Allowed", "siteBlocker", "allow", "example.com")}<details data-s=focus><summary>Focus (${FOCUS.length})</summary>${packHtml(FOCUS)}</details><details data-s=adult><summary>Adult (${ADULT.length})</summary>${packHtml(ADULT)}</details><details data-s=sb-adv><summary>Advanced</summary>${time2("From", "siteBlocker", "from", "To", "to")}${numR("Snooze min", "siteBlocker", "snoozeMinutes")}${hkR("siteBlocker")}</details></details>`;
   };
 
   const secVM = () => {
@@ -1522,6 +1522,7 @@
       _feed = null;
       _skipEl = null;
       _skipN = 0;
+      _composerDone = false;
     });
 
     function tagWiden(fd) {
@@ -1629,12 +1630,13 @@
         if (!recheck(p)) continue;
         let junk = false;
         for (const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
-          if (junk) break;
           const raw = (e.textContent || "").trim();
           if (!raw || raw.length > 40) continue;
           const t = norm(raw);
-          if (!t) continue;
-          if (MARKS.some((m) => t.includes(m)) || EXACT.includes(t)) junk = true;
+          if (t && isJunk(t)) {
+            junk = true;
+            break;
+          }
         }
         if (!junk && hasFollowBtn(p, p.getBoundingClientRect().top)) junk = true;
         if (junk) {
@@ -2308,7 +2310,6 @@
         } catch (_) {}
       }, 1500);
     });
-    interceptNav(() => {});
     onHotkey(
       () => L.toggleHotkey,
       () => toggleLI(!C.linkedin.enabled),

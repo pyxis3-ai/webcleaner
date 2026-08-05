@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.10.7** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+[Changelog](#changelog) · [Limits](#limits--what-it-cannot-do) — the version lives in the script's `@version` header, which is what your manager reads.
 
 ## Install
 
@@ -20,7 +20,7 @@ Each module runs inside its own error boundary, so one site's redesign breaking 
 | **YouTube Skip Ads**    | Auto-skips and mutes video ads, skips sponsored Shorts, hides feed/banner/overlay ads, dismisses the anti-adblock popup. Optional distraction-free watch page: hide recommendations, comments, chips, merch/promo shelves and live chat, with the player widened into the reclaimed space. Desktop, `m.youtube.com` and YouTube Music.                                |
 | **Site Blocker**        | Adult filter (on by default) plus an opt-in "Focus Pack" of distracting sites, custom block/allow lists, a schedule window, and a snooze.                                                                                                                                                                                                                             |
 | **LinkedIn**            | Hides Promoted posts and Suggested content, plus the top bar and both side rails, and widens the feed into the reclaimed space. Uses no CSS selectors — LinkedIn hashes its class names — so it matches on rendered text and identifies rails by geometry.                                                                                                            |
-| **View Mode Switcher**  | Force Desktop or Mobile rendering per site. On a phone, Desktop reflows the real page via the viewport meta. On a desktop browser, Mobile rewrites the site's own `@media` breakpoints to a phone width so pages genuinely reflow instead of only reporting a spoofed User-Agent — full-width by default, with an optional centred phone frame under **Frame**.                                     |
+| **View Mode Switcher**  | Force Desktop or Mobile rendering per site. On a phone, Desktop reflows the real page via the viewport meta. On a desktop browser, Mobile rewrites the site's own `@media` breakpoints to a phone width so pages genuinely reflow instead of only reporting a spoofed User-Agent — full-width by default, with an optional centred phone frame under **Frame**.       |
 
 Everything is configurable from one in-page panel — open **⚙ Web Cleaner** from your userscript-manager menu, or tap the 🧼 button.
 
@@ -98,7 +98,7 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ### 8.10.5
 
-- **Fixed a scrolling regression introduced in 8.10.2.** The mobile tray detector memoized elements *after* its viewport-proximity test, not before, so every div outside the viewport band was skipped without ever being recorded — and re-measured with `getBoundingClientRect()` on every sweep, forever. Because the sweep is driven by a `subtree: true` MutationObserver over a feed that mutates constantly while scrolling, this meant a full-document forced synchronous layout on essentially every frame, with a cost that grew as the feed grew. Measured on a live logged-in mobile feed scrolled to 3153 divs: **2846 elements re-measured per sweep at 2.5–3.4ms**, versus **84 at 0.4–0.7ms** after the fix — 34× fewer measurements, and constant rather than growing. The viewport test was never needed for correctness in the first place, since the detector matches on width and height, which do not depend on scroll position; removing it makes the detector both cheaper and able to catch a tray before it scrolls into view. `hideMobileChrome` had the same unbounded shape with no memoization at all, and would rescan every div on every sweep whenever a page had no composer to find, so it now memoizes too. Verified after the fix: still exactly one node tagged and the Stories tray still hidden.
+- **Fixed a scrolling regression introduced in 8.10.2.** The mobile tray detector memoized elements _after_ its viewport-proximity test, not before, so every div outside the viewport band was skipped without ever being recorded — and re-measured with `getBoundingClientRect()` on every sweep, forever. Because the sweep is driven by a `subtree: true` MutationObserver over a feed that mutates constantly while scrolling, this meant a full-document forced synchronous layout on essentially every frame, with a cost that grew as the feed grew. Measured on a live logged-in mobile feed scrolled to 3153 divs: **2846 elements re-measured per sweep at 2.5–3.4ms**, versus **84 at 0.4–0.7ms** after the fix — 34× fewer measurements, and constant rather than growing. The viewport test was never needed for correctness in the first place, since the detector matches on width and height, which do not depend on scroll position; removing it makes the detector both cheaper and able to catch a tray before it scrolls into view. `hideMobileChrome` had the same unbounded shape with no memoization at all, and would rescan every div on every sweep whenever a page had no composer to find, so it now memoizes too. Verified after the fix: still exactly one node tagged and the Stories tray still hidden.
 
 ### 8.10.4
 
