@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.7.1** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.10.4** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
