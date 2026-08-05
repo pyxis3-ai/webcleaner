@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.8
+// @version      8.10.9
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -166,7 +166,13 @@
         if (ov !== null && typeof ov === "object" && !Array.isArray(ov)) r[k] = deepMerge(dv, ov);
         continue;
       }
-      if (typeof ov === typeof dv) r[k] = ov;
+      if (typeof ov !== typeof dv) continue;
+      if (typeof ov !== "number") {
+        r[k] = ov;
+        continue;
+      }
+      if (!Number.isFinite(ov)) continue;
+      r[k] = BOUNDS[k] ? clamp(ov, BOUNDS[k][0], BOUNDS[k][1]) : ov;
     }
     return r;
   }
@@ -1265,13 +1271,10 @@
       const vb = addBtn(icon, "rgba(20,20,34,.8)", "#fff", ".7", "");
       vb.addEventListener("pointerdown", () => {
         clearLT();
-        lt = setTimeout(
-          () => {
-            lt = null;
-            if (!drag) setVM("auto");
-          },
-          clamp(C.viewMode.longPressMs, BOUNDS.longPressMs[0], BOUNDS.longPressMs[1]),
-        );
+        lt = setTimeout(() => {
+          lt = null;
+          if (!drag) setVM("auto");
+        }, C.viewMode.longPressMs);
       });
       vb.addEventListener("pointerup", () => {
         const armed = !!lt;
@@ -1420,7 +1423,7 @@
       if (f.hideComments) R.push(`${X}[aria-label="Leave a comment"],${X}[aria-label^="Comment"]{display:none!important}`);
       if (f.hideLikeCounts) R.push(`${X}[aria-label^="Like:"],${X}[aria-label*="reaction"],${X}[aria-label*="reacted"]{display:none!important}`);
       if (f.widenFeed) {
-        const W = clamp(f.feedMaxWidth, BOUNDS.feedMaxWidth[0], BOUNDS.feedMaxWidth[1]);
+        const W = f.feedMaxWidth;
         R.push(
           `${X}[role="main"]{max-width:none!important;width:100%!important;margin:0 auto!important}`,
           `${X}[data-fcf-w]{width:auto!important;max-width:none!important;min-width:0!important}`,
@@ -2197,7 +2200,7 @@
     if (!L.enabled) document.documentElement.classList.add("li-off");
     const LR = ["html:not(.li-off) [data-li-h]{display:none!important}", "html:not(.li-off) [data-li-rail]{display:none!important}"];
     if (L.widenFeed) {
-      const W = clamp(L.feedMaxWidth, 500, 3000);
+      const W = L.feedMaxWidth;
       LR.push(
         `html:not(.li-off) [data-li-feed]{width:min(${W}px,97vw)!important;max-width:none!important;margin:0 auto!important}`,
         `html:not(.li-off) [data-li-feed]>*{width:100%!important;max-width:none!important}`,
