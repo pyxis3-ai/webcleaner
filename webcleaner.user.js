@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.5
+// @version      8.10.6
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -113,7 +113,7 @@
       spoofTouch: true,
       spoofMedia: true,
       reflowCss: true,
-      frameOnDesktop: true,
+      frameOnDesktop: false,
       longPressMs: 500,
       desktopWidth: 1280,
       mobileWidth: 412,

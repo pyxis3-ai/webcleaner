@@ -2,7 +2,7 @@
 
 A browser userscript for a cleaner, ad-free, more focused web — built and verified against the live 2026 Facebook and YouTube DOM.
 
-**Current version: 8.10.5** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
+**Current version: 8.10.6** · [Changelog](#changelog) · [Limits](#limits--what-it-cannot-do)
 
 ## Install
 
@@ -20,7 +20,7 @@ Each module runs inside its own error boundary, so one site's redesign breaking 
 | **YouTube Skip Ads**    | Auto-skips and mutes video ads, skips sponsored Shorts, hides feed/banner/overlay ads, dismisses the anti-adblock popup. Optional distraction-free watch page: hide recommendations, comments, chips, merch/promo shelves and live chat, with the player widened into the reclaimed space. Desktop, `m.youtube.com` and YouTube Music.                                |
 | **Site Blocker**        | Adult filter (on by default) plus an opt-in "Focus Pack" of distracting sites, custom block/allow lists, a schedule window, and a snooze.                                                                                                                                                                                                                             |
 | **LinkedIn**            | Hides Promoted posts and Suggested content, plus the top bar and both side rails, and widens the feed into the reclaimed space. Uses no CSS selectors — LinkedIn hashes its class names — so it matches on rendered text and identifies rails by geometry.                                                                                                            |
-| **View Mode Switcher**  | Force Desktop or Mobile rendering per site. On a phone, Desktop reflows the real page via the viewport meta. On a desktop browser, Mobile rewrites the site's own `@media` breakpoints to a phone width and clamps the page into a centred phone frame, so pages genuinely reflow instead of only reporting a spoofed User-Agent.                                     |
+| **View Mode Switcher**  | Force Desktop or Mobile rendering per site. On a phone, Desktop reflows the real page via the viewport meta. On a desktop browser, Mobile rewrites the site's own `@media` breakpoints to a phone width so pages genuinely reflow instead of only reporting a spoofed User-Agent — full-width by default, with an optional centred phone frame under **Frame**.                                     |
 
 Everything is configurable from one in-page panel — open **⚙ Web Cleaner** from your userscript-manager menu, or tap the 🧼 button.
 
@@ -83,6 +83,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 - **Markup rotation.** Meta and Google change markup without notice. Three things happen: the panel warns you, the module button gets an amber ring, and a rendered-text fallback engages that recovers some ads without depending on markup. Recovery is partial by design — the fallback is bounded and hides only the tightest element containing a visible sponsored label, so it never risks the page. Full coverage returns when selectors are updated.
 
 ## Changelog
+
+### 8.10.6
+
+- **Fixed: Mobile view on a desktop browser showed a mostly dark-grey screen.** 8.8.0 changed `frameOnDesktop` from off to on, reasoning that the phone frame made Mobile mode "coherent out of the box". In practice the frame clamps the page to 412px and paints `#202124` across everything else, so on a 1512px window roughly **73% of the screen becomes dark grey** — which reads as a broken page, not a feature. The default is back to **off**. Nothing else changes: `Reflow CSS` still rewrites the site's breakpoints, so Mobile mode still genuinely reflows the page, now full-width and without the surround. Verified side by side on a live logged-in Facebook at 1512px — with the frame the content sits in a narrow column inside a large grey field, without it the page renders as a clean full-width mobile layout. The frame remains available as **Frame** in the View Mode section for anyone who wants the phone look.
+- **Why the feed looks like it stops loading.** It does not — measured on a live logged-in mobile feed, 61 post units continued to arrive across 22 scroll steps, so infinite scroll is working. What changed is how much of it is shown: 22 units hidden by the phrase matcher, **18 hidden by `Follow suggestions`** and 21 left visible, i.e. **66% of the feed hidden, with the Follow filter alone accounting for 30%**. That is the filter doing exactly what it was asked to do on a feed that is mostly recommendations, but the effect is a sparse feed that can read as "posts stopped coming". `Follow suggestions` is a single switch in the Facebook section if a fuller feed is preferred.
 
 ### 8.10.5
 
