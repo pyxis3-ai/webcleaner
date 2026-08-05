@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.9
+// @version      8.10.10
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -441,14 +441,20 @@
     return /Mobi|Android|iPhone|iPod|Windows Phone/i.test(ua) || /iPad/.test(ua) || (/Macintosh/.test(ua) && tp > 1) || navigator.userAgentData?.mobile === true;
   })();
 
+  const VM_MODES = ["desktop", "mobile", "auto"];
+  const vmOf = (s) => (VM_MODES.includes(s) ? s : null);
   const vmMode =
-    (() => {
-      try {
-        return localStorage.getItem(PFX + "vm") || "";
-      } catch (_) {
-        return "";
-      }
-    })() || C.viewMode.newSiteDefault;
+    vmOf(
+      (() => {
+        try {
+          return localStorage.getItem(PFX + "vm");
+        } catch (_) {
+          return null;
+        }
+      })(),
+    ) ||
+    vmOf(C.viewMode.newSiteDefault) ||
+    "auto";
   const vmActive = () => vmMode !== "auto";
   const setVM = (m) => {
     try {
@@ -834,7 +840,7 @@
 
   const secVM = () => {
     const v = C.viewMode,
-      modes = ["desktop", "mobile", "auto"];
+      modes = VM_MODES;
     const seg = (val, attr) => `<button class="${(attr === "data-vm" ? vmMode : v.newSiteDefault) === val ? "on" : ""}" ${attr}="${val}">${val[0].toUpperCase() + val.slice(1)}</button>`;
     return `<details data-s=vm><summary>🖥 View ${vmMode.toUpperCase()}</summary><div class="r2"><span>Site</span><div class="sg">${modes.map((m) => seg(m, "data-vm")).join("")}</div><span style="margin-left:auto">Def</span><div class="sg">${modes.map((m) => seg(m, "data-df")).join("")}</div></div>${swG(
       "viewMode",
