@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.2
+// @version      8.10.3
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -827,6 +827,25 @@
       }
     }
 
+    let _composerDone=false;
+    function hideMobileChrome(){
+      if(f.hideTopBar)for(const tl of document.querySelectorAll('[role="tablist"]:not([data-fcf])'))tl.setAttribute("data-fcf","");
+      if(!f.hideComposer||_composerDone)return;
+      const first=q("[data-tracking-duration-id]");
+      if(!first)return;
+      const limit=first.getBoundingClientRect().top+scrollY,vw=innerWidth;
+      if(scrollY>limit+400)return;
+      for(const el of document.querySelectorAll("div")){
+        const r=el.getBoundingClientRect();
+        if(r.top+scrollY>=limit)continue;
+        if(r.width<vw*0.9||r.width>vw*1.02||r.height<50||r.height>95)continue;
+        if(el.closest("[data-fcf]")||el.closest("[data-tracking-duration-id]"))continue;
+        if(!el.querySelector('[role="button"][aria-label]')||!el.querySelector("img"))continue;
+        el.setAttribute("data-fcf","");
+        _composerDone=true;
+      }
+    }
+
     const _trayChecked=new WeakSet();
     function hideTrayRows(){
       if(!f.hideReelsTrays)return;
@@ -898,7 +917,7 @@
         processMobile();
         handleReels();
         if(hasDesktopShell()){hideLeftNav();if(isClean())processDesktop();processCards();}
-        else if(isFeed())hideTrayRows();
+        else if(isFeed()){hideTrayRows();hideMobileChrome();}
         if(Health.miss>0)rescueSweep(MARKS,"data-fcf",12);
       }catch(_){}
     }
