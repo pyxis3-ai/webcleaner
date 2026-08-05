@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.10.12
+// @version      8.10.13
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -126,6 +126,13 @@
   };
 
   const PFX = "wc7_";
+  const VERSION = (() => {
+    try {
+      return GM_info?.script?.version || "";
+    } catch (_) {
+      return "";
+    }
+  })();
   const gmOk = typeof GM_getValue === "function" && typeof GM_setValue === "function";
   const gGet = (k, d) => {
     if (gmOk)
@@ -968,7 +975,7 @@
           : "";
       const ok = safeHTML(
         sh,
-        `<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner</h1><button class="x" data-x>✕</button></div>${warn}${secSB()}${secVM()}${isFB ? secFB() : ""}${isYT ? secYT() : ""}${isLI ? secLI() : ""}${secIO()}</div>`,
+        `<style>${PCSS}</style><div class="bk" data-x></div><div class="cd" role="dialog"><div class="hd"><h1>🧼 Web Cleaner${VERSION ? ` <span style="font-size:10px;font-weight:400;color:#777">v${esc(VERSION)}</span>` : ""}</h1><button class="x" data-x>✕</button></div>${warn}${secSB()}${secVM()}${isFB ? secFB() : ""}${isYT ? secYT() : ""}${isLI ? secLI() : ""}${secIO()}</div>`,
       );
       if (!ok) {
         degraded(sh);
