@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.2
+// @version      8.12.3
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -163,7 +163,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.2";
+  const VERSION = "8.12.3";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -287,6 +287,7 @@
     return Math.max(a, Math.min(b, v));
   }
   const bare = () => location.hostname.replace(/^www\./, "");
+  const STRIP = /[\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/g;
   const norm = (s) =>
     String(s)
       .normalize("NFKC")
@@ -431,10 +432,11 @@
     return miss;
   }
 
-  function visText(scope, cap) {
+  function visText(scope, cap, bt, bb) {
     const g = [];
     let budget = cap || 400;
     const w = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+    const banded = bt !== undefined;
     let n;
     while ((n = w.nextNode()) && budget-- > 0) {
       const t = n.nodeValue;
@@ -445,10 +447,12 @@
       if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0" || cs.fontSize === "0px") continue;
       const pr = p.getBoundingClientRect();
       if (!pr.width || !pr.height) continue;
+      if (banded && (pr.right <= 0 || pr.bottom < bt || pr.top > bb)) continue;
       const rg = document.createRange();
       rg.selectNodeContents(n);
       const r = rg.getBoundingClientRect();
       if (!r.width || !r.height) continue;
+      if (banded && (r.right <= 0 || r.top < bt || r.top > bb)) continue;
       g.push({ c: t.trim(), t: Math.round(r.top), l: Math.round(r.left) });
     }
     const seen = new Set(),
@@ -461,7 +465,24 @@
       }
     }
     kept.sort((a, b) => a.t - b.t || a.l - b.l);
-    return norm(kept.map((x) => x.c).join(""));
+    return kept
+      .map((x) => x.c)
+      .join("")
+      .replace(STRIP, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function tightestMatch(el, marks, fits) {
+    if (!fits(el.getBoundingClientRect())) return false;
+    const txt = norm(visText(el, 400));
+    if (!txt || !marks.some((m) => txt.includes(m))) return false;
+    for (const c of el.children) {
+      if (!fits(c.getBoundingClientRect())) continue;
+      const ct = norm(visText(c, 300));
+      if (ct && marks.some((m) => ct.includes(m))) return false;
+    }
+    return true;
   }
 
   function rescueSweep(marks, attr, maxHide) {
@@ -474,21 +495,7 @@
       if (hid >= (maxHide || 12)) break;
       if (el.__rq) continue;
       const fits = (rr) => rr.width >= lo && rr.width <= hi && rr.height >= 70 && rr.height <= Math.max(vh * 1.6, 900) && rr.bottom >= -400 && rr.top <= vh + 400;
-      const r = el.getBoundingClientRect();
-      if (!fits(r)) continue;
-      const txt = visText(el, 400);
-      if (!txt || !marks.some((m) => txt.includes(m))) continue;
-      let tighter = false;
-      for (const c of el.children) {
-        const cr = c.getBoundingClientRect();
-        if (!fits(cr)) continue;
-        const ct = visText(c, 300);
-        if (ct && marks.some((m) => ct.includes(m))) {
-          tighter = true;
-          break;
-        }
-      }
-      if (tighter) continue;
+      if (!tightestMatch(el, marks, fits)) continue;
       el.__rq = 1;
       el.setAttribute(attr, "");
       hid++;
@@ -1477,7 +1484,6 @@
       ...f.extraJunkPhrases.map(norm),
     ];
     const EXACT = f.hideReelsTrays ? ["reels", "reelsandshortvideos", "stories"] : [];
-    const STRIP = /[\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/g;
 
     (() => {
       const X = "html.fcf-s ";
@@ -1530,44 +1536,6 @@
         new MutationObserver(vschedule).observe(document.documentElement, { childList: true, subtree: true });
       }
     })();
-
-    function readText(scope, bt, bb) {
-      const g = [];
-      let budget = 600;
-      const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
-      let n;
-      while ((n = walker.nextNode()) && budget-- > 0) {
-        const s = n.nodeValue;
-        if (!s?.trim()) continue;
-        const p = n.parentElement;
-        if (!p || p.closest('[aria-hidden="true"]')) continue;
-        const cs = getComputedStyle(p);
-        if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0" || cs.fontSize === "0px") continue;
-        const pr = p.getBoundingClientRect();
-        if (!pr.width || !pr.height || pr.right <= 0 || pr.bottom < bt || pr.top > bb) continue;
-        const rng = document.createRange();
-        rng.selectNodeContents(n);
-        const r = rng.getBoundingClientRect();
-        if (!r.width || !r.height || r.right <= 0 || r.top < bt || r.top > bb) continue;
-        g.push({ c: s.trim(), t: Math.round(r.top), l: Math.round(r.left) });
-      }
-      const seen = new Set(),
-        kept = [];
-      for (const x of g) {
-        const k = `${x.t}:${x.l}`;
-        if (!seen.has(k)) {
-          seen.add(k);
-          kept.push(x);
-        }
-      }
-      kept.sort((a, b) => a.t - b.t || a.l - b.l);
-      return kept
-        .map((x) => x.c)
-        .join("")
-        .replace(STRIP, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
 
     const isJunk = (c) => MARKS.some((m) => c.includes(m)) || EXACT.includes(c);
 
@@ -1646,7 +1614,7 @@
         if (r0.v) continue;
         const r = st.getBoundingClientRect();
         if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
-        const hdr = readText(st, r.top - 2, r.top + 130);
+        const hdr = visText(st, 600, r.top - 2, r.top + 130);
         if (!hdr) continue;
         if (isJunk(norm(hdr)) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
           st.setAttribute("data-fcf", "");
@@ -1893,7 +1861,7 @@
       if (st.n >= 8) return false;
       st.n++;
       const r = rl.getBoundingClientRect(),
-        c = norm(readText(rl, r.top - 2, r.bottom + 2));
+        c = norm(visText(rl, 600, r.top - 2, r.bottom + 2));
       if (SPON.some((m) => c.includes(m))) st.s = true;
       return st.s;
     }
@@ -2376,22 +2344,8 @@
         if (hid >= 15) break;
         if (_liFeed && (el === _liFeed || el.contains(_liFeed))) continue;
         if (fresh(el, "data-li-h").v) continue;
-        const r = el.getBoundingClientRect();
         const fits = (rr) => rr.width >= lo && rr.width <= hi && rr.height >= 100 && rr.height <= Math.max(vh * 2, 1400) && rr.bottom >= -500 && rr.top <= vh + 500;
-        if (!fits(r)) continue;
-        const txt = visText(el, 400);
-        if (!txt || !MK.some((m) => txt.includes(m))) continue;
-        let tighter = false;
-        for (const c of el.children) {
-          const cr = c.getBoundingClientRect();
-          if (!fits(cr)) continue;
-          const ct = visText(c, 300);
-          if (ct && MK.some((m) => ct.includes(m))) {
-            tighter = true;
-            break;
-          }
-        }
-        if (tighter) continue;
+        if (!tightestMatch(el, MK, fits)) continue;
         rec(el).v = "junk";
         el.setAttribute("data-li-h", "");
         hid++;
