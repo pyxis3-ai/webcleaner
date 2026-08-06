@@ -84,6 +84,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.2
+
+- **One scheduler, one toggle, one way to switch a module off.** The three modules each carried their own idle-debounce wrapper, and they disagreed — two used `requestIdleCallback`, LinkedIn used a raw `requestAnimationFrame`, and only one contained its errors. There is now a single `debounced` helper, and its idle callback is bounded by a 250ms timeout so a busy page cannot defer a sweep indefinitely. Every module already has an interval backstop, so this is latency, not correctness.
+- The three toggle functions were the same four steps written three times, and they disabled their module two different ways: Facebook and LinkedIn gated every CSS rule behind a root class (`.fcf-off`, `.li-off`) while YouTube set `disabled` on its stylesheet. Since each module's rules live in a single `<style>` element, the stylesheet flag does everything the root class did with one fewer concept. Both classes and every `html:not(.…-off)` prefix are gone, replaced by a `MODULES` descriptor and one `toggleModule`.
+
 ### 8.12.1
 
 - **Sponsored-Reel skipping never ran on iOS at all.** `handleReels` located the playing reel by scanning `<video>` elements taller than 200px, but the iOS Reels surface renders no `video` element — the reel is a snap-scroll container with the media painted elsewhere — so the search returned nothing and the function returned before doing any work. `skipReelsAds` was dead on the platform the setting matters most on. Reel identification now uses the same slot enumeration as the rest of the module: the child of the Reels scroller nearest the centre of the scroller's own viewport, falling back to the `video` scan on desktop.

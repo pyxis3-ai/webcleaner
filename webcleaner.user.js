@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.1
+// @version      8.12.2
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,6 +127,22 @@
   };
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
+  const ric = window.requestIdleCallback?.bind(window);
+  const idle = ric ? (fn) => ric(fn, { timeout: 250 }) : requestAnimationFrame;
+  const debounced = (fn) => {
+    let queued = false;
+    return () => {
+      if (queued) return;
+      queued = true;
+      idle(() => {
+        queued = false;
+        try {
+          fn();
+        } catch (_) {}
+      });
+    };
+  };
+
   const NODE_ST = new WeakMap();
   const rec = (el) => {
     let r = NODE_ST.get(el);
@@ -147,7 +163,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.1";
+  const VERSION = "8.12.2";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1421,17 +1437,26 @@
     );
   }
 
-  const toggleFB = (on) => {
-    C.facebook.enabled = on;
-    save("facebook");
-    document.documentElement.classList.toggle("fcf-off", !on);
-    const b = document.getElementById("fcf-btn");
+  const MODULES = {
+    facebook: { style: "fcf-css", btn: "fcf-btn" },
+    youtube: { style: "yt-css", btn: "yt-btn" },
+    linkedin: { style: "li-css", btn: "li-btn" },
+  };
+  const toggleModule = (name, on) => {
+    C[name].enabled = on;
+    save(name);
+    const m = MODULES[name];
+    const ss = document.getElementById(m.style);
+    if (ss) ss.disabled = !on;
+    const b = document.getElementById(m.btn);
     if (b) b.style.opacity = on ? "1" : ".3";
   };
+  const toggleFB = (on) => toggleModule("facebook", on);
+  const toggleYT = (on) => toggleModule("youtube", on);
+  const toggleLI = (on) => toggleModule("linkedin", on);
 
   function initFB() {
     const f = C.facebook;
-    if (!f.enabled) document.documentElement.classList.add("fcf-off");
     if (f.forceMostRecent && (location.pathname === "/" || location.pathname === "/home.php") && !/[?&]sk=/.test(location.search)) {
       let tried = false;
       try {
@@ -1461,10 +1486,10 @@
     const STRIP = /[\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/g;
 
     (() => {
-      const X = "html.fcf-s:not(.fcf-off) ";
-      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}"];
+      const X = "html.fcf-s ";
+      const R = ["[data-fcf]{display:none!important}"];
       if (f.hideRightSidebar) R.push(`${X}[role="complementary"]{display:none!important}`);
-      if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`, `html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
+      if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`, `[data-fcf-ln]{display:none!important}`);
       if (f.hideComposer) R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
       if (f.hideTopBar)
         R.push(
@@ -1485,8 +1510,9 @@
       } else {
         R.push(`${X}[role="main"]{margin-left:auto!important;margin-right:auto!important}`);
       }
-      if (f.hideVideoAutoplay) R.push(`html:not(.fcf-off) video{pointer-events:auto}`);
+      if (f.hideVideoAutoplay) R.push(`video{pointer-events:auto}`);
       addStyle("fcf-css", R.join("\n"));
+      if (!f.enabled) document.getElementById("fcf-css").disabled = true;
       if (f.hideVideoAutoplay) {
         let vsch = false;
         const muteVids = () => {
@@ -1974,17 +2000,7 @@
         if (Health.miss > 0) rescueSweep(MARKS, "data-fcf", 12);
       } catch (_) {}
     }
-    let sch = false;
-    const idle = window.requestIdleCallback?.bind(window) ?? requestAnimationFrame,
-      schedule = () => {
-        if (!sch) {
-          sch = true;
-          idle(() => {
-            sch = false;
-            sweep();
-          });
-        }
-      };
+    const schedule = debounced(sweep);
     document.documentElement.classList.toggle("fcf-s", isFeed());
     onReady(() => {
       sweep();
@@ -2002,15 +2018,6 @@
       () => toggleFB(!C.facebook.enabled),
     );
   }
-
-  const toggleYT = (on) => {
-    C.youtube.enabled = on;
-    save("youtube");
-    const s = document.getElementById("yt-css");
-    if (s) s.disabled = !on;
-    const b = document.getElementById("yt-btn");
-    if (b) b.style.opacity = on ? "1" : ".3";
-  };
 
   function initYT() {
     const y = C.youtube;
@@ -2291,17 +2298,10 @@
         if (w) w.setAttribute("data-yt-h", "");
       }
     }
-    let sch = false;
-    const schedule = () => {
-      if (!sch) {
-        sch = true;
-        requestAnimationFrame(() => {
-          sch = false;
-          tick();
-          hideFeedAds();
-        });
-      }
-    };
+    const schedule = debounced(() => {
+      tick();
+      hideFeedAds();
+    });
     onReady(() => {
       tick();
       hideFeedAds();
@@ -2320,26 +2320,15 @@
     );
   }
 
-  const toggleLI = (on) => {
-    C.linkedin.enabled = on;
-    save("linkedin");
-    document.documentElement.classList.toggle("li-off", !on);
-    const b = document.getElementById("li-btn");
-    if (b) b.style.opacity = on ? "1" : ".3";
-  };
-
   function initLI() {
     const L = C.linkedin;
-    if (!L.enabled) document.documentElement.classList.add("li-off");
-    const LR = ["html:not(.li-off) [data-li-h]{display:none!important}", "html:not(.li-off) [data-li-rail]{display:none!important}"];
+    const LR = ["[data-li-h]{display:none!important}", "[data-li-rail]{display:none!important}"];
     if (L.widenFeed) {
       const W = L.feedMaxWidth;
-      LR.push(
-        `html:not(.li-off) [data-li-feed]{width:min(${W}px,97vw)!important;max-width:none!important;margin:0 auto!important}`,
-        `html:not(.li-off) [data-li-feed]>*{width:100%!important;max-width:none!important}`,
-      );
+      LR.push(`[data-li-feed]{width:min(${W}px,97vw)!important;max-width:none!important;margin:0 auto!important}`, `[data-li-feed]>*{width:100%!important;max-width:none!important}`);
     }
     addStyle("li-css", LR.join("\n"));
+    if (!L.enabled) document.getElementById("li-css").disabled = true;
 
     let _liFeed = null;
     function tagTopBar() {
@@ -2414,19 +2403,7 @@
         hid++;
       }
     }
-    let sch = false;
-    const idle = window.requestIdleCallback?.bind(window) ?? requestAnimationFrame;
-    const schedule = () => {
-      if (!sch) {
-        sch = true;
-        idle(() => {
-          sch = false;
-          try {
-            sweepLI();
-          } catch (_) {}
-        });
-      }
-    };
+    const schedule = debounced(sweepLI);
     onReady(() => {
       try {
         sweepLI();
