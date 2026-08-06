@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.5
+// @version      8.11.6
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -43,6 +43,7 @@
       hideSuggested: true,
       hidePeopleYouMayKnow: true,
       hideFollowSuggestions: true,
+      hideEmptyCards: true,
       hideReelsTrays: true,
       hideComments: false,
       hideVideoAutoplay: true,
@@ -127,7 +128,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.5";
+  const VERSION = "8.11.6";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -887,6 +888,7 @@
       ["Suggested", "hideSuggested"],
       ["People YMKN", "hidePeopleYouMayKnow"],
       ["Follow suggestions", "hideFollowSuggestions"],
+      ["Empty cards", "hideEmptyCards"],
       ["Reels/Stories", "hideReelsTrays"],
       ["Comments", "hideComments"],
       ["Video autoplay", "hideVideoAutoplay"],
@@ -1441,7 +1443,7 @@
 
     (() => {
       const X = "html.fcf-s:not(.fcf-off) ";
-      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}"];
+      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}", "html:not(.fcf-off) [data-fcf-e]{display:none!important}"];
       if (f.hideRightSidebar) R.push(`${X}[role="complementary"]{display:none!important}`);
       if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`, `html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
       if (f.hideComposer) R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
@@ -1677,6 +1679,27 @@
       scrollBy(0, -1);
     }
 
+    const LOADER_ZONE = 1200;
+    function collapseEmptyCards() {
+      if (!f.hideEmptyCards) return;
+      const docH = document.documentElement.scrollHeight;
+      for (const e of document.querySelectorAll("div.displayed")) {
+        const h = e.style && e.style.height;
+        if (!h || !/^\d+px$/.test(h)) continue;
+        const marked = e.hasAttribute("data-fcf-e");
+        const alive = (e.textContent || "").trim().length > 0 || !!e.querySelector("img,video,canvas,[data-tracking-duration-id]");
+        if (alive) {
+          if (marked) e.removeAttribute("data-fcf-e");
+          continue;
+        }
+        if (marked) continue;
+        const r = e.getBoundingClientRect();
+        if (r.height < 80) continue;
+        if (docH - (r.bottom + scrollY) < LOADER_ZONE) continue;
+        e.setAttribute("data-fcf-e", "");
+      }
+    }
+
     function processMobile() {
       for (const p of mobilePostNodes()) {
         if (!recheck(p)) continue;
@@ -1899,6 +1922,7 @@
         document.documentElement.classList.toggle("fcf-s", isFeed());
         keepScrollAnchored(() => {
           processMobile();
+          collapseEmptyCards();
           settleAfterDrops();
         });
         handleReels();

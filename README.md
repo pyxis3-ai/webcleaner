@@ -84,6 +84,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.11.6
+
+- **Removed the grey boxes in the mobile feed.** They are Facebook's own empty skeleton cards, not spacing and not anything this script left behind: `div.m.displayed` with an inline pixel height, no text, no media and no post inside. Measured on a real iPhone, they were the entire blank area — two of them accounted for 100% of the blank bands in view, and a hit test at their centre returned `body`, meaning nothing was painted there at all. Tracked three of them for twelve seconds and across a scroll: none ever gained text, media or a post, so they are dead space rather than placeholders waiting on content.
+- They are now marked `data-fcf-e` and hidden by stylesheet, never removed. That matters for two reasons: the module's off switch un-hides them like everything else, and if Facebook does later inject content into one, the next sweep clears the mark and it reappears. Cards within 1200px of the document bottom are always left alone — that is the load-more sentinel region, and hiding it in 8.10.16 is what stopped the feed loading.
+- Added a **Empty cards** toggle under the Facebook section.
+
 ### 8.11.5
 
 - **Settings use the modern `GM.*` storage API when a manager provides it, instead of only the legacy `GM_*` one.** `gSet` now mirrors writes to `GM.setValue` as well as `GM_setValue` and `localStorage`, and `hydrateShared` seeds `localStorage` from `GM.getValue` at startup so the next page load starts in sync. Startup reads stay synchronous, so nothing about boot order changes — the modern API is promise-based and cannot be read during config construction. Menu commands prefer `GM.registerMenuCommand` and fall back to the legacy name.
