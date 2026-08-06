@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.6
+// @version      8.11.7
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -128,7 +128,7 @@
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
   const PFX = "wc7_";
-  const VERSION = "8.11.6";
+  const VERSION = "8.11.7";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1700,6 +1700,31 @@
       }
     }
 
+    function collapseEmptyReels() {
+      if (!f.hideEmptyCards || !onReelsRoute()) return;
+      const sc = document.querySelector('[class*="vscroller"]');
+      if (!sc) return;
+      const top = sc.getBoundingClientRect().top;
+      const was = sc.scrollTop;
+      let above = 0;
+      for (const e of sc.children) {
+        if (/filler/.test(String(e.className || ""))) continue;
+        if (!(e.matches?.("[data-tracking-duration-id]") || e.querySelector("[data-tracking-duration-id]"))) continue;
+        if (e.children.length || (e.textContent || "").trim().length || e.querySelector("img,video,canvas")) {
+          e._wcE = 0;
+          e.removeAttribute("data-fcf-e");
+          continue;
+        }
+        if (e.hasAttribute("data-fcf-e")) continue;
+        const r = e.getBoundingClientRect();
+        if (r.height < 100) continue;
+        if ((e._wcE = (e._wcE || 0) + 1) < 3) continue;
+        if (r.bottom <= top) above += r.height;
+        e.setAttribute("data-fcf-e", "");
+      }
+      if (above) sc.scrollTop = Math.max(0, was - above);
+    }
+
     function processMobile() {
       for (const p of mobilePostNodes()) {
         if (!recheck(p)) continue;
@@ -1923,6 +1948,7 @@
         keepScrollAnchored(() => {
           processMobile();
           collapseEmptyCards();
+          collapseEmptyReels();
           settleAfterDrops();
         });
         handleReels();

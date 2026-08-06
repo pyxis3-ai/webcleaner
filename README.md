@@ -84,6 +84,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.11.7
+
+- **Removed the full-screen blank slots in Reels.** On the iOS Reels surface the snap scroller holds one child per reel; some are `[data-tracking-duration-id]` nodes with no children, no text and no media, sized to a full screen. Tracked eight of them on a real iPhone across four swipes and sixteen seconds: none ever rendered, and two were on screen while empty, which is the blank you actually see. Facebook eventually zeroes them itself and recycles one out of the DOM, so they are abandoned slots rather than pending ones. They are now hidden after three consecutive empty sweeps, so a slot that is merely mid-render is never touched, and the `filler` spacer is always skipped because it is the virtualisation element that reserves scroll height.
+- **Hiding inside the Reels scroller no longer moves the reel you are on.** `keepScrollAnchored` compensates document scroll, but Reels scrolls an inner element, so collapsing a slot above the viewport shifted the current reel — measured as `scrollTop` jumping 10966 to 8385. The collapse now sums the height of slots hidden entirely above the scroller viewport and subtracts it from `scrollTop`.
+
 ### 8.11.6
 
 - **Removed the grey boxes in the mobile feed.** They are Facebook's own empty skeleton cards, not spacing and not anything this script left behind: `div.m.displayed` with an inline pixel height, no text, no media and no post inside. Measured on a real iPhone, they were the entire blank area — two of them accounted for 100% of the blank bands in view, and a hit test at their centre returned `body`, meaning nothing was painted there at all. Tracked three of them for twelve seconds and across a scroll: none ever gained text, media or a post, so they are dead space rather than placeholders waiting on content.
