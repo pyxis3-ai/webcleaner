@@ -816,15 +816,7 @@
         if (doReflow) reflowSheets(vw, true, orient, deep);
       } catch (_) {}
     };
-    let queued = false;
-    const pump = () => {
-      if (queued) return;
-      queued = true;
-      (window.requestAnimationFrame || setTimeout)(() => {
-        queued = false;
-        beat(false);
-      }, 0);
-    };
+    const pump = debounced(() => beat(false));
     const deepBeat = () => beat(true);
 
     beat(true);
@@ -833,17 +825,19 @@
     document.addEventListener("DOMContentLoaded", deepBeat);
     window.addEventListener("load", deepBeat);
     [100, 300, 600, 1200, 2500, 4000].forEach((t) => setTimeout(deepBeat, t));
-    if (!root)
+    if (!root) {
+      let observing = false;
       [0, 16, 50].forEach((t) =>
         setTimeout(() => {
           const r = document.head || document.documentElement;
-          if (r && window.MutationObserver && !r.__wcVpObs) {
-            r.__wcVpObs = 1;
+          if (r && window.MutationObserver && !observing) {
+            observing = true;
             new MutationObserver(pump).observe(r, { childList: true, subtree: true });
           }
           deepBeat();
         }, t),
       );
+    }
   }
 
   const keyLabel = (h) => (h.ctrl ? "Ctrl+" : "") + (h.alt ? "Alt+" : "") + (h.shift ? "Shift+" : "") + String(h.key || "").toUpperCase();
