@@ -7,6 +7,6 @@
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
-    "prettier": "latest"
+    "prettier": "3.9.6"
   }
 }

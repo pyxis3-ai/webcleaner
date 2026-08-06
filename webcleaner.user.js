@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.0
+// @version      8.12.1
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -147,7 +147,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.0";
+  const VERSION = "8.12.1";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1804,25 +1804,50 @@
 
     const _reelSt = new WeakMap();
     let _skipT = 0;
-    function handleReels() {
-      if (!f.skipReelsAds || !onReelsRoute()) return;
-      const cy = innerHeight / 2;
-      let act = null,
-        best = 1e9;
-      for (const v of document.querySelectorAll("video")) {
-        const r = v.getBoundingClientRect();
+    function activeReel() {
+      const sc = reelScroller();
+      const box = sc ? sc.getBoundingClientRect() : { top: 0, height: innerHeight };
+      const cy = box.top + box.height / 2;
+      let best = null,
+        d = 1e9;
+      const cands = sc ? [...sc.children].filter((e) => !/filler/.test(String(e.className || ""))) : document.querySelectorAll("video");
+      for (const e of cands) {
+        const r = e.getBoundingClientRect();
         if (r.height < 200) continue;
-        const d = Math.abs((r.top + r.bottom) / 2 - cy);
-        if (d < best) {
-          best = d;
-          act = v;
+        const dist = Math.abs((r.top + r.bottom) / 2 - cy);
+        if (dist < d) {
+          d = dist;
+          best = e;
         }
       }
+      return best;
+    }
+
+    function advanceReel(rl) {
+      const sc = reelScroller();
+      if (sc) {
+        sc.scrollBy(0, sc.clientHeight);
+        return;
+      }
+      const nx = q('[role="button"][aria-label="Next Card"]');
+      if (nx) {
+        nx.click();
+        return;
+      }
+      const tg = rl.closest("[tabindex]") || rl;
+      for (const tp of ["keydown", "keyup"]) tg.dispatchEvent(new KeyboardEvent(tp, { key: "ArrowDown", code: "ArrowDown", keyCode: 40, which: 40, bubbles: true }));
+    }
+
+    function handleReels() {
+      if (!f.skipReelsAds || !onReelsRoute()) return;
+      const act = activeReel();
       if (!act) return;
       let rl = act;
-      for (let i = 0; i < 12 && rl.parentElement; i++) {
-        rl = rl.parentElement;
-        if (rl.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]')) break;
+      if (!reelScroller()) {
+        for (let i = 0; i < 12 && rl.parentElement; i++) {
+          rl = rl.parentElement;
+          if (rl.querySelector('[aria-label="Like"],[aria-label^="Comment"],[role="button"][aria-label="Next Card"]')) break;
+        }
       }
       if (!reelSpon(rl, act)) {
         if (act !== _skipEl) {
@@ -1838,13 +1863,7 @@
       if (Date.now() - _skipT < 600 || _skipN >= 8) return;
       _skipN++;
       _skipT = Date.now();
-      const nx = q('[role="button"][aria-label="Next Card"]');
-      if (nx) {
-        nx.click();
-        return;
-      }
-      const tg = rl.closest("[tabindex]") || rl;
-      for (const tp of ["keydown", "keyup"]) tg.dispatchEvent(new KeyboardEvent(tp, { key: "ArrowDown", code: "ArrowDown", keyCode: 40, which: 40, bubbles: true }));
+      advanceReel(rl);
     }
 
     function reelSpon(rl, key) {

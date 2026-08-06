@@ -84,6 +84,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.1
+
+- **Sponsored-Reel skipping never ran on iOS at all.** `handleReels` located the playing reel by scanning `<video>` elements taller than 200px, but the iOS Reels surface renders no `video` element — the reel is a snap-scroll container with the media painted elsewhere — so the search returned nothing and the function returned before doing any work. `skipReelsAds` was dead on the platform the setting matters most on. Reel identification now uses the same slot enumeration as the rest of the module: the child of the Reels scroller nearest the centre of the scroller's own viewport, falling back to the `video` scan on desktop.
+- Advancing past a sponsored reel now scrolls the snap container by one screen where one exists, instead of relying on a `Next Card` button and synthetic ArrowDown keys that the mobile surface does not have. Pinned by a test asserting a sponsored reel advances exactly one screen and a genuine one does not move.
+- Pinned `prettier` to an exact version — `latest` meant every install pulled whatever was newest, which is neither reproducible nor safe against a compromised release, the same concern that removed the `npx@latest` fetch from the pre-commit hook.
+
 ### 8.12.0
 
 - **One pipeline for feed filtering, replacing four overlapping ones.** The Facebook module had accumulated three ways to hide something (a `data-fcf` attribute, a separate `data-fcf-e` attribute, and `dropPost` calling `.remove()`), four per-node state fields (`_wc`, `_wcN`, `_wcE`, `_wcSig`), two "is this element empty" predicates that disagreed, and two post enumerations. Each had been correct in isolation and wrong together. There is now a single path: enumerate slots, classify once, hide reversibly, anchor the scroll.
