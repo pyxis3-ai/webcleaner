@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.11.7
+// @version      8.12.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -127,8 +127,27 @@
   };
 
   const NEEDS_SCROLL_ANCHOR = !(window.CSS && CSS.supports && CSS.supports("overflow-anchor", "auto"));
+  const NODE_ST = new WeakMap();
+  const rec = (el) => {
+    let r = NODE_ST.get(el);
+    if (!r) NODE_ST.set(el, (r = { sig: -1, keep: 0, empty: 0, v: null }));
+    return r;
+  };
+  const fresh = (el, mark) => {
+    const r = rec(el);
+    const sig = (el.textContent || "").length;
+    if (r.sig !== sig) {
+      r.sig = sig;
+      r.keep = 0;
+      r.empty = 0;
+      if (r.v) el.removeAttribute(mark);
+      r.v = null;
+    }
+    return r;
+  };
+
   const PFX = "wc7_";
-  const VERSION = "8.11.7";
+  const VERSION = "8.12.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1443,7 +1462,7 @@
 
     (() => {
       const X = "html.fcf-s:not(.fcf-off) ";
-      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}", "html:not(.fcf-off) [data-fcf-e]{display:none!important}"];
+      const R = ["html:not(.fcf-off) [data-fcf]{display:none!important}"];
       if (f.hideRightSidebar) R.push(`${X}[role="complementary"]{display:none!important}`);
       if (f.hideLeftSidebar) R.push(`${X}[role="navigation"][aria-label="Shortcuts"]{display:none!important}`, `html:not(.fcf-off) [data-fcf-ln]{display:none!important}`);
       if (f.hideComposer) R.push(`${X}[role="region"][aria-label="Create a post"]{display:none!important}`);
@@ -1598,31 +1617,21 @@
       return best;
     }
 
-    function recheck(el) {
-      const s = (el.textContent || "").length;
-      if (el._wcSig !== s) {
-        el._wcSig = s;
-        el._wcN = 0;
-        if (el._wc === "h") el.removeAttribute("data-fcf");
-        el._wc = null;
-      }
-      return el._wc !== "c";
-    }
-
     function processDesktop() {
       const fd = feedBox();
       if (!fd) return;
       const vh = innerHeight;
       for (const st of fd.children) {
-        if (!recheck(st)) continue;
-        if (st._wc === "h") continue;
+        const r0 = fresh(st, "data-fcf");
+        if (r0.v) continue;
         const r = st.getBoundingClientRect();
         if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
         const hdr = readText(st, r.top - 2, r.top + 130);
         if (!hdr) continue;
         if (isJunk(norm(hdr)) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
-          dropPost(st);
-        } else if ((st._wcN = (st._wcN || 0) + 1) >= 6) st._wc = "c";
+          st.setAttribute("data-fcf", "");
+          r0.v = "junk";
+        } else if (++r0.keep >= 6) r0.v = "keep";
       }
     }
 
@@ -1631,17 +1640,16 @@
       if (!scope) return;
       const vh = innerHeight,
         lim = Math.min(560, innerWidth * 0.55);
+      const fits = (rr) => rr.width >= 120 && rr.width <= lim && rr.height >= 80 && rr.height <= 620 && rr.bottom >= -500 && rr.top <= vh + 500;
       for (const el of scope.querySelectorAll("div,a")) {
-        if (el._wc) continue;
-        const fits = (rr) => rr.width >= 120 && rr.width <= lim && rr.height >= 80 && rr.height <= 620 && rr.bottom >= -500 && rr.top <= vh + 500;
+        if (rec(el).v) continue;
         const r = el.getBoundingClientRect();
         if (!fits(r)) continue;
         const raw = norm(el.textContent || "");
         if (!raw || !MARKS.some((m) => raw.includes(m))) continue;
         let tighter = false;
         for (const c of el.children) {
-          const cr = c.getBoundingClientRect();
-          if (!fits(cr)) continue;
+          if (!fits(c.getBoundingClientRect())) continue;
           if (MARKS.some((m) => norm(c.textContent || "").includes(m))) {
             tighter = true;
             break;
@@ -1649,7 +1657,7 @@
         }
         if (tighter) continue;
         el.setAttribute("data-fcf", "");
-        el._wc = "h";
+        rec(el).v = "junk";
       }
     }
 
@@ -1663,86 +1671,70 @@
       return [];
     }
 
-    let _dropped = 0;
-    function dropPost(el) {
-      try {
-        el.remove();
-      } catch (_) {
-        el.setAttribute("data-fcf", "");
-      }
-      _dropped++;
-    }
-    function settleAfterDrops() {
-      if (!_dropped) return;
-      _dropped = 0;
-      scrollBy(0, 1);
-      scrollBy(0, -1);
-    }
-
+    const SLOT_H = /^\d+px$/;
     const LOADER_ZONE = 1200;
-    function collapseEmptyCards() {
-      if (!f.hideEmptyCards) return;
-      const docH = document.documentElement.scrollHeight;
-      for (const e of document.querySelectorAll("div.displayed")) {
-        const h = e.style && e.style.height;
-        if (!h || !/^\d+px$/.test(h)) continue;
-        const marked = e.hasAttribute("data-fcf-e");
-        const alive = (e.textContent || "").trim().length > 0 || !!e.querySelector("img,video,canvas,[data-tracking-duration-id]");
-        if (alive) {
-          if (marked) e.removeAttribute("data-fcf-e");
-          continue;
-        }
-        if (marked) continue;
-        const r = e.getBoundingClientRect();
-        if (r.height < 80) continue;
-        if (docH - (r.bottom + scrollY) < LOADER_ZONE) continue;
-        e.setAttribute("data-fcf-e", "");
+    const hasContent = (el) => !!(el.textContent || "").trim() || !!el.querySelector("img,video,canvas,[data-tracking-duration-id]");
+    const fixedH = (el) => SLOT_H.test((el.style && el.style.height) || "");
+
+    function slotOf(el) {
+      let n = el,
+        t = el;
+      for (let i = 0; i < 3; i++) {
+        const p = n.parentElement;
+        if (!p || p === document.body || p.children.length !== 1) break;
+        n = p;
+        if (fixedH(p)) t = p;
       }
+      return t;
     }
 
-    function collapseEmptyReels() {
-      if (!f.hideEmptyCards || !onReelsRoute()) return;
-      const sc = document.querySelector('[class*="vscroller"]');
-      if (!sc) return;
-      const top = sc.getBoundingClientRect().top;
-      const was = sc.scrollTop;
-      let above = 0;
-      for (const e of sc.children) {
-        if (/filler/.test(String(e.className || ""))) continue;
-        if (!(e.matches?.("[data-tracking-duration-id]") || e.querySelector("[data-tracking-duration-id]"))) continue;
-        if (e.children.length || (e.textContent || "").trim().length || e.querySelector("img,video,canvas")) {
-          e._wcE = 0;
-          e.removeAttribute("data-fcf-e");
-          continue;
-        }
-        if (e.hasAttribute("data-fcf-e")) continue;
-        const r = e.getBoundingClientRect();
-        if (r.height < 100) continue;
-        if ((e._wcE = (e._wcE || 0) + 1) < 3) continue;
-        if (r.bottom <= top) above += r.height;
-        e.setAttribute("data-fcf-e", "");
+    function reelScroller() {
+      return onReelsRoute() ? document.querySelector('[class*="vscroller"]') : null;
+    }
+
+    function feedSlots() {
+      const sc = reelScroller();
+      if (sc) return [...sc.children].filter((e) => !/filler/.test(String(e.className || "")));
+      if (hasDesktopShell()) return [];
+      const out = new Set();
+      for (const p of mobilePostNodes()) out.add(slotOf(p));
+      for (const w of document.querySelectorAll("div.displayed")) if (fixedH(w)) out.add(w);
+      return out;
+    }
+
+    function junkIn(el) {
+      for (const e of el.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
+        const raw = (e.textContent || "").trim();
+        if (!raw || raw.length > 40) continue;
+        const t = norm(raw);
+        if (t && isJunk(t)) return true;
       }
-      if (above) sc.scrollTop = Math.max(0, was - above);
+      return false;
     }
 
     function processMobile() {
-      for (const p of mobilePostNodes()) {
-        if (!recheck(p)) continue;
-        if (p._wc === "h") continue;
-        const r = p.getBoundingClientRect();
-        let junk = false;
-        for (const e of p.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
-          const raw = (e.textContent || "").trim();
-          if (!raw || raw.length > 40) continue;
-          const t = norm(raw);
-          if (t && isJunk(t)) {
-            junk = true;
-            break;
-          }
+      const reels = !!reelScroller();
+      const docH = document.documentElement.scrollHeight;
+      for (const el of feedSlots()) {
+        const r0 = fresh(el, "data-fcf");
+        if (r0.v) continue;
+        if (el.querySelectorAll("[data-tracking-duration-id]").length > 1) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.height) continue;
+        if (junkIn(el) || hasFollowBtn(el, r.top)) {
+          el.setAttribute("data-fcf", "");
+          r0.v = "junk";
+          continue;
         }
-        if (!junk && r.height && hasFollowBtn(p, r.top)) junk = true;
-        if (junk) dropPost(p);
-        else if (r.height && (p._wcN = (p._wcN || 0) + 1) >= 6) p._wc = "c";
+        if (f.hideEmptyCards && !hasContent(el) && r.height >= 80 && (reels || docH - (r.bottom + scrollY) >= LOADER_ZONE)) {
+          if (++r0.empty >= (reels ? 3 : 1)) {
+            el.setAttribute("data-fcf", "");
+            r0.v = "empty";
+          }
+          continue;
+        }
+        r0.empty = 0;
+        if (++r0.keep >= 6) r0.v = "keep";
       }
     }
 
@@ -1922,10 +1914,13 @@
     };
     const hasDesktopShell = () => !!q('[role="main"]');
     function keepScrollAnchored(mutate) {
-      if (!NEEDS_SCROLL_ANCHOR || !scrollY) return mutate();
-      const mid = Math.floor(innerWidth / 2);
+      const host = reelScroller();
+      const at = host ? host.scrollTop : scrollY;
+      if ((!NEEDS_SCROLL_ANCHOR && !host) || !at) return mutate();
+      const box = host ? host.getBoundingClientRect() : { top: 0, left: 0, width: innerWidth, height: innerHeight };
+      const mid = Math.floor(box.left + box.width / 2);
       const marks = [];
-      for (let y = 1; y < Math.min(innerHeight, 400) && marks.length < 6; y += 60) {
+      for (let y = box.top + 1; y < box.top + Math.min(box.height, 400) && marks.length < 6; y += 60) {
         const el = document.elementFromPoint(mid, y);
         if (el && el !== document.body && el !== document.documentElement) marks.push([el, el.getBoundingClientRect().top]);
       }
@@ -1935,7 +1930,7 @@
         const r = el.getBoundingClientRect();
         if (!r.height) continue;
         const d = r.top - top;
-        if (d) scrollBy(0, d);
+        if (d) host ? (host.scrollTop += d) : scrollBy(0, d);
         return;
       }
     }
@@ -1947,18 +1942,11 @@
         document.documentElement.classList.toggle("fcf-s", isFeed());
         keepScrollAnchored(() => {
           processMobile();
-          collapseEmptyCards();
-          collapseEmptyReels();
-          settleAfterDrops();
         });
         handleReels();
         if (hasDesktopShell()) {
           hideLeftNav();
-          if (isClean())
-            keepScrollAnchored(() => {
-              processDesktop();
-              settleAfterDrops();
-            });
+          if (isClean()) keepScrollAnchored(processDesktop);
           keepScrollAnchored(processCards);
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
@@ -2385,12 +2373,7 @@
       for (const el of document.querySelectorAll("div,article,section,li")) {
         if (hid >= 15) break;
         if (_liFeed && (el === _liFeed || el.contains(_liFeed))) continue;
-        const sig = (el.textContent || "").length;
-        if (el._li) {
-          if (el._lisig === sig) continue;
-          el._li = 0;
-          el.removeAttribute("data-li-h");
-        }
+        if (fresh(el, "data-li-h").v) continue;
         const r = el.getBoundingClientRect();
         const fits = (rr) => rr.width >= lo && rr.width <= hi && rr.height >= 100 && rr.height <= Math.max(vh * 2, 1400) && rr.bottom >= -500 && rr.top <= vh + 500;
         if (!fits(r)) continue;
@@ -2407,8 +2390,7 @@
           }
         }
         if (tighter) continue;
-        el._li = 1;
-        el._lisig = sig;
+        rec(el).v = "junk";
         el.setAttribute("data-li-h", "");
         hid++;
       }

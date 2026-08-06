@@ -84,6 +84,14 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.0
+
+- **One pipeline for feed filtering, replacing four overlapping ones.** The Facebook module had accumulated three ways to hide something (a `data-fcf` attribute, a separate `data-fcf-e` attribute, and `dropPost` calling `.remove()`), four per-node state fields (`_wc`, `_wcN`, `_wcE`, `_wcSig`), two "is this element empty" predicates that disagreed, and two post enumerations. Each had been correct in isolation and wrong together. There is now a single path: enumerate slots, classify once, hide reversibly, anchor the scroll.
+- **Nothing is removed from the DOM any more.** `.remove()` existed because hiding a post left its blank space behind — but the space belonged to the post's fixed-height wrapper, not the post, so hiding the wrapper collapses it completely. `slotOf` walks up through single-child parents to that wrapper. This is why the destructive behaviour was never necessary, and it removes a whole bug class: hiding is undone by the module's off switch, so turning Facebook off now genuinely restores every post. Pinned by tests asserting the junk post is invisible, still present in the DOM, and leaves **0px** of blank.
+- **One scroll anchor for both scroll hosts.** `keepScrollAnchored` only ever called `scrollBy`, so it could not compensate the Reels inner scroller, which needed its own `scrollTop` arithmetic. It now resolves the scroll host — the Reels scroller or the document — and anchors either.
+- **One node-state store shared by every module.** LinkedIn had its own `_li`/`_lisig` copy of the same idea; both now use a single `WeakMap` and one `fresh()` helper that resets a node's verdict when its content changes.
+- `processMobile`'s slot scan is now gated on the mobile shell, so it cannot touch a desktop page. Verified: 0 spurious changes across eight unrelated sites, and the full harness set is unchanged.
+
 ### 8.11.7
 
 - **Removed the full-screen blank slots in Reels.** On the iOS Reels surface the snap scroller holds one child per reel; some are `[data-tracking-duration-id]` nodes with no children, no text and no media, sized to a full screen. Tracked eight of them on a real iPhone across four swipes and sixteen seconds: none ever rendered, and two were on screen while empty, which is the blank you actually see. Facebook eventually zeroes them itself and recycles one out of the DOM, so they are abandoned slots rather than pending ones. They are now hidden after three consecutive empty sweeps, so a slot that is merely mid-render is never touched, and the `filler` spacer is always skipped because it is the virtualisation element that reserves scroll height.
