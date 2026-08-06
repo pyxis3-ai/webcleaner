@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.6
+
+- **Reels could not be scrolled at all.** 8.12.5 removed junk from the mobile feed but still hid it in Reels, and a `display:none` child of a scroll-snap container loses its snap point. With eight or nine slots hidden the scroller had almost nothing left to snap to, so every swipe snapped straight back. Measured on a real iPhone across five swipes: with the module on, `scrollTop` stayed at **0** every time and only **2** slots were visible; with it off, `scrollTop` advanced 1290 → 2580 → 3870 → 7740 with 10–14 visible. Reels now retires nodes the same way the feed does.
+- Both mobile surfaces therefore remove, and only the desktop shell hides — a single branch in `retire`, which is why this was a one-line correction rather than another patch.
+
 ### 8.12.5
 
 - **Restores the 8.12.x consolidation work with the one thing it got wrong corrected.** 8.12.0 replaced `dropPost`'s `.remove()` with reversible stylesheet hiding, on the reasoning that the leftover blank space belonged to the post's fixed-height wrapper and hiding that wrapper collapses it. That is true in isolation and every synthetic test agreed, but it is not true on the live mobile feed: Facebook's virtualiser tracks each slot's height, and a `display:none` slot stays in its bookkeeping as a zero-height row, so the feed stops advancing. On the mobile feed the node has to leave the tree.

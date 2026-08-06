@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.5
+// @version      8.12.6
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -164,7 +164,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.5";
+  const VERSION = "8.12.6";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1693,14 +1693,15 @@
     }
 
     function retire(el, r0) {
-      if (reelScroller() || hasDesktopShell()) {
+      if (hasDesktopShell()) {
         el.setAttribute("data-fcf", "");
         r0.hidden = true;
         return;
       }
-      // Facebook's mobile feed virtualiser tracks slot heights; a display:none slot
-      // stays in its bookkeeping as a zero-height row and stalls further loading,
-      // so on that surface the node has to leave the tree.
+      // Both mobile surfaces need the node gone rather than hidden: the feed virtualiser
+      // keeps a display:none slot in its height bookkeeping as a zero-height row and stops
+      // loading, and in Reels a display:none child of the scroll-snap container loses its
+      // snap point, so the scroller cannot advance past it.
       try {
         el.remove();
       } catch (_) {
