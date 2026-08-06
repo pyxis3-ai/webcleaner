@@ -85,6 +85,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.5
+
+- **Restores the 8.12.x consolidation work with the one thing it got wrong corrected.** 8.12.0 replaced `dropPost`'s `.remove()` with reversible stylesheet hiding, on the reasoning that the leftover blank space belonged to the post's fixed-height wrapper and hiding that wrapper collapses it. That is true in isolation and every synthetic test agreed, but it is not true on the live mobile feed: Facebook's virtualiser tracks each slot's height, and a `display:none` slot stays in its bookkeeping as a zero-height row, so the feed stops advancing. On the mobile feed the node has to leave the tree.
+- Retirement is now a single policy in one function rather than a decision spread across call sites: Reels and the desktop shell mark the node and let the stylesheet hide it, the mobile feed removes it. The destructive-when-disabled bug that 8.11.3 fixed stays fixed, because `sweep` still returns immediately when the module is off, so nothing is ever removed while it is disabled.
+- Everything else from 8.12.0–8.12.3 is retained: one classifier, one node-state store shared by every module, one debounce, one text reader, one tightest-match search, one scroll anchor covering both the document and the Reels inner scroller, and no copy-paste duplication.
+
 ### 8.12.3
 
 - **One text reader instead of two.** `readText` and `visText` were the same tree walk, the same visibility filtering, the same de-duplication by rendered position and the same sort, differing only in that one accepted a vertical band and the two returned differently-normalised strings. They are now a single `visText(scope, cap, bandTop, bandBottom)` where the band is optional, and every caller normalises, which is what most of them already did.
