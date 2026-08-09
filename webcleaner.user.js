@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.16.0
+// @version      8.17.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -165,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.16.0";
+  const VERSION = "8.17.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1646,23 +1646,55 @@
       }
     }
 
-    // Facebook renders the desktop "Sponsored" label as dozens of one-character spans
-    // in scrambled order, padded with decoys and U+034F joiners, so neither textContent
-    // nor the painted text is recoverable. The structure itself is the signature.
-    const SCRAMBLED = (el) => {
+    // Facebook paints the desktop label from ~60 one-character spans in scrambled DOM
+    // order, padded with decoys stacked at a single x on a second line. The characters
+    // that actually render sit on the topmost line at distinct x, so reading the boxes
+    // recovers the real word where textContent and naive text walking cannot.
+    const ZW = /[\u034F\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/g;
+    const HAS_ZW = /[\u034F\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/;
+    function paintedLabel(el) {
+      const pts = [];
+      for (const sp of el.querySelectorAll("span")) {
+        if (sp.children.length) continue;
+        const t = (sp.textContent || "").replace(ZW, "");
+        if (t.length !== 1) continue;
+        const cs = getComputedStyle(sp);
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        const rs = sp.getClientRects();
+        if (!rs.length || rs[0].width <= 0) continue;
+        pts.push({ c: t, x: Math.round(rs[0].left), y: Math.round(rs[0].top) });
+      }
+      if (pts.length < 2) return "";
+      let minY = pts[0].y;
+      for (const p of pts) if (p.y < minY) minY = p.y;
+      const line = pts.filter((p) => Math.abs(p.y - minY) <= 3).sort((a, b) => a.x - b.x);
+      const seen = new Set(),
+        keep = [];
+      for (const p of line) {
+        if (seen.has(p.x)) continue;
+        seen.add(p.x);
+        keep.push(p.c);
+      }
+      return keep.join("").trim();
+    }
+    const OBFUSCATED = (el) => {
       const t = el.textContent || "";
-      return t.length >= 20 && t.length <= 220 && t.includes("\u034F") && el.querySelectorAll("span").length >= 15;
+      return t.length >= 20 && t.length <= 220 && HAS_ZW.test(t) && el.querySelectorAll("span").length >= 15;
     };
+
     function hideLabelledAds() {
       const main = q('[role="main"]');
       if (!main) return;
       const vh = innerHeight;
       let hid = 0;
-      const scrambled = [...main.querySelectorAll("span,a,div")].filter(SCRAMBLED);
-      for (const e of [...main.querySelectorAll('span,a,h3,h4,div[role="heading"]'), ...scrambled]) {
+      const obf = [...main.querySelectorAll("span,a,div")].filter(OBFUSCATED);
+      for (const e of [...main.querySelectorAll('span,a,h3,h4,div[role="heading"]'), ...obf]) {
         if (hid >= 12) break;
         const raw = (e.textContent || "").trim();
-        if (!SCRAMBLED(e)) {
+        if (OBFUSCATED(e)) {
+          const seen = norm(paintedLabel(e));
+          if (!seen || seen.length > 30 || !(EXACT.includes(seen) || MARKS.some((m) => m && seen.includes(m)))) continue;
+        } else {
           if (!raw || raw.length > 40) continue;
           const t = norm(raw);
           if (!t || !(EXACT.includes(t) || MARKS.some((m) => m && t.includes(m)))) continue;

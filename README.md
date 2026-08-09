@@ -85,6 +85,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.17.0
+
+- **Reads the desktop label as painted, instead of guessing from structure.** 8.16.0 treated "many spans plus a U+034F joiner" as an ad signal, which was wrong in the most dangerous direction: reverse-engineering the live DOM showed _every_ post header is built that way — organic posts carry the identical 60-joiner obfuscation around their timestamp. That heuristic would have hidden genuine posts.
+- The obfuscation works by painting the real characters on the **topmost line at increasing x**, while roughly sixty decoy characters are stacked at a single x on a lower line, everything interleaved with U+034F. Reading the client rects — keep one-character spans that actually render, take the top line, sort by x, drop the stacked duplicates — recovers the real word. Verified live: the same labels that read as noise in `textContent` resolve to `Just now`, `Ad`, `Learn more`, `Just now`.
+- So an obfuscated label is only treated as an ad when its **reconstructed** text matches a sponsor or ad marker. Organic timestamps such as `Just now` are read correctly and kept.
+
 ### 8.16.0
 
 - **Desktop "Sponsored" labels are scrambled beyond any text matching.** Facebook renders them as roughly sixty one-character spans in deliberately wrong DOM order, padded with decoy characters and separated by U+034F grapheme joiners, then paints the correct subset in the right order with CSS. Read from the DOM the label is 59 characters of noise; even `visText`, which reconstructs painted text, recovers only fragments such as `Ado` and `5ms`. Reported from a live feed as a YuMOVE UK post that survived every text-based rule.
