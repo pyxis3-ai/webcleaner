@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.13.0
+// @version      8.14.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -44,6 +44,7 @@
       hidePeopleYouMayKnow: true,
       hideFollowSuggestions: true,
       hideEmptyCards: true,
+      hideAIContent: true,
       hideReelsTrays: true,
       hideComments: false,
       hideVideoAutoplay: true,
@@ -164,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.13.0";
+  const VERSION = "8.14.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -926,6 +927,7 @@
       ["People YMKN", "hidePeopleYouMayKnow"],
       ["Follow suggestions", "hideFollowSuggestions"],
       ["Empty cards", "hideEmptyCards"],
+      ["AI content", "hideAIContent"],
       ["Reels/Stories", "hideReelsTrays"],
       ["Comments", "hideComments"],
       ["Video autoplay", "hideVideoAutoplay"],
@@ -1476,7 +1478,12 @@
       "sponsored paidpartnership publicidad patrocinado sponsoris commandit gesponsert sponsorizzat gesponsord bersponsor sponsorlu sponsorowan sponsrad sponset sponsoreret ممول ממומן реклама 広告 광고 赞助 贊助 χορηγούμενη"
         .split(" ")
         .map(norm);
+    const AI_MARKS =
+      "aigenerated generatedbyai imaginedwithai madewithai createdwithai aiinfo metaai askmetaai trymetaai aistudio poweredbyai chatwithai aiimage aigeneratedcontent contenidogeneradoconia genereparlia mitkigeneriert محتوىمولدبالذكاءالاصطناعي"
+        .split(" ")
+        .map(norm);
     const MARKS = [
+      ...(f.hideAIContent ? AI_MARKS : []),
       ...(f.hideSponsored ? SPON : []),
       ...(f.hideSuggested
         ? ["suggestedforyou", "suggestedpost", "pagesforyou", "pagesyoumaylike", "groupsyoumaylike", "suggestedaccounts", "peopletofollow", "accountstofollow", "pagestofollow"]
