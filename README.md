@@ -85,6 +85,13 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.19.0
+
+- **The desktop feed is one pass again.** It had grown to four overlapping ones — `processDesktop` walking `feedBox()`'s children, `hideLabelledAds` walking labels, `processCards`, and the health rescue — with five different ways of deciding something was an ad. They disagreed, and the gaps between them are where ads lived.
+- There is now a single path: find the label, climb to its story, retire it. One classifier, `labelHit`, covers every form the label takes — an exact `Ad`/`Sponsored` token, a marker inside a longer header, and the obfuscated variant read back through `paintedLabel`.
+- **`feedBox` is out of the ad path entirely.** Its heuristic picks one container and scores it by child count; on the live DOM it selected a container with four children while the real stories sat elsewhere, so those stories were never examined no matter how good the matching was. That single dependency caused the surviving `Chiltern Railways` and `Fine Dining` ads, and it made the test fixture unstable — adding a case changed which container was chosen and unrelated assertions flipped.
+- The desktop suite now covers every label form, an ad deliberately placed outside `feedBox`'s container, and the false-positive controls, at 14/14. Three cases that had been failing were never code defects: they sat outside the viewport guard in a fixture that never scrolls.
+
 ### 8.18.0
 
 - **Facebook's actual AI label is `AI content`, which was never matched.** The list added in 8.14.0 carried `AI generated`, `Imagined with AI`, `Meta AI` and even `AI generated content`, but not the two-word label Facebook actually renders — seen in the feed as `ADHD Treatment · AI content · 2m`. Added, along with localised equivalents. Since AI markers share the junk-marker path, this covers the feed and Reels on both desktop and mobile at once.

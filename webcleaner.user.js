@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.18.0
+// @version      8.19.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -165,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.18.0";
+  const VERSION = "8.19.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1627,25 +1627,6 @@
       return best;
     }
 
-    function processDesktop() {
-      const fd = feedBox();
-      if (!fd) return;
-      const vh = innerHeight;
-      for (const st of fd.children) {
-        const r0 = fresh(st, "data-fcf");
-        if (r0.v) continue;
-        const r = st.getBoundingClientRect();
-        if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
-        const hdr = visText(st, 600, r.top - 2, r.top + 130);
-        if (!hdr) continue;
-        if (isJunk(norm(hdr)) || hasAdToken(hdr) || junkIn(st, r.top - 2, r.top + 130) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
-          st.setAttribute("data-fcf", "");
-          r0.v = "junk";
-          r0.hidden = true;
-        } else if (++r0.keep >= 6) r0.v = "keep";
-      }
-    }
-
     // Facebook paints the desktop label from ~60 one-character spans in scrambled DOM
     // order, padded with decoys stacked at a single x on a second line. The characters
     // that actually render sit on the topmost line at distinct x, so reading the boxes
@@ -1682,7 +1663,36 @@
       return t.length >= 20 && t.length <= 220 && HAS_ZW.test(t) && el.querySelectorAll("span").length >= 15;
     };
 
-    function hideLabelledAds() {
+    function labelHit(el) {
+      const raw = (el.textContent || "").trim();
+      if (!raw) return false;
+      if (OBFUSCATED(el)) {
+        const seen = norm(paintedLabel(el));
+        return !!(seen && seen.length <= 30 && (EXACT.includes(seen) || MARKS.some((m) => m && seen.includes(m))));
+      }
+      if (raw.length <= 40) {
+        const t = norm(raw);
+        if (t && (EXACT.includes(t) || MARKS.some((m) => m && t.includes(m)))) return true;
+      }
+      return raw.length <= 200 && hasAdToken(raw);
+    }
+
+    function storyOf(el, main) {
+      const r = el.getBoundingClientRect();
+      let n = el;
+      for (let i = 0; i < 18 && n.parentElement; i++) {
+        n = n.parentElement;
+        if (n === main || n === document.body) break;
+        const rr = n.getBoundingClientRect();
+        if (rr.width >= 400 && rr.height >= 150 && r.top - rr.top <= 160) return n;
+      }
+      return null;
+    }
+
+    // One desktop pass: find the label, climb to its story, retire it. Deliberately not
+    // routed through feedBox — that heuristic picks a single container and any story
+    // outside it was never examined, which is how ads survived every text fix.
+    function processDesktop() {
       const main = q('[role="main"]');
       if (!main) return;
       const vh = innerHeight;
@@ -1690,33 +1700,25 @@
       const obf = [...main.querySelectorAll("span,a,div")].filter(OBFUSCATED);
       for (const e of [...main.querySelectorAll('span,a,h3,h4,div[role="heading"]'), ...obf]) {
         if (hid >= 12) break;
-        const raw = (e.textContent || "").trim();
-        if (OBFUSCATED(e)) {
-          const seen = norm(paintedLabel(e));
-          if (!seen || seen.length > 30 || !(EXACT.includes(seen) || MARKS.some((m) => m && seen.includes(m)))) continue;
-        } else {
-          if (!raw || raw.length > 40) continue;
-          const t = norm(raw);
-          if (!t || !(EXACT.includes(t) || MARKS.some((m) => m && t.includes(m)))) continue;
-        }
         if (e.closest('[role="complementary"]')) continue;
         const er = e.getBoundingClientRect();
         if (!er.height || er.bottom < -400 || er.top > vh + 400) continue;
-        let n = e,
-          story = null;
-        for (let i = 0; i < 18 && n.parentElement; i++) {
-          n = n.parentElement;
-          if (n === main || n === document.body) break;
-          const r = n.getBoundingClientRect();
-          if (r.width >= 400 && r.height >= 150 && er.top - r.top <= 160) {
-            story = n;
-            break;
-          }
-        }
-        if (!story || rec(story).v) continue;
+        if (!labelHit(e)) continue;
+        const story = storyOf(e, main);
+        if (!story || rec(story).hidden) continue;
         story.setAttribute("data-fcf", "");
         Object.assign(rec(story), { v: "junk", hidden: true });
         hid++;
+      }
+      for (const st of main.querySelectorAll('[role="article"]')) {
+        const r0 = fresh(st, "data-fcf");
+        if (r0.v) continue;
+        const r = st.getBoundingClientRect();
+        if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
+        if (hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
+          st.setAttribute("data-fcf", "");
+          Object.assign(r0, { v: "junk", hidden: true });
+        } else if (++r0.keep >= 6) r0.v = "keep";
       }
     }
 
@@ -2077,7 +2079,6 @@
         if (hasDesktopShell()) {
           hideLeftNav();
           if (isClean()) keepScrollAnchored(processDesktop);
-          hideLabelledAds();
           keepScrollAnchored(processCards);
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
