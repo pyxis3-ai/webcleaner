@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.9
+// @version      8.13.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -164,7 +164,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.9";
+  const VERSION = "8.13.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1543,6 +1543,16 @@
     })();
 
     const isJunk = (c) => MARKS.some((m) => c.includes(m)) || EXACT.includes(c);
+    const AD_SET = new Set(EXACT);
+    const hasAdToken = (text) => {
+      if (!text) return false;
+      for (const w of String(text).split(/[^\p{L}]+/u)) {
+        if (!w) continue;
+        const t = norm(w);
+        if (t && t.length <= 12 && AD_SET.has(t)) return true;
+      }
+      return false;
+    };
 
     const FOLLOW = new Set(
       [
@@ -1621,7 +1631,7 @@
         if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
         const hdr = visText(st, 600, r.top - 2, r.top + 130);
         if (!hdr) continue;
-        if (isJunk(norm(hdr)) || junkIn(st, r.top - 2, r.top + 130) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
+        if (isJunk(norm(hdr)) || hasAdToken(hdr) || junkIn(st, r.top - 2, r.top + 130) || hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) {
           st.setAttribute("data-fcf", "");
           r0.v = "junk";
           r0.hidden = true;
@@ -1741,7 +1751,7 @@
         if (el.querySelectorAll("[data-tracking-duration-id]").length > 1) continue;
         const r = el.getBoundingClientRect();
         if (!r.height) continue;
-        if (junkIn(el) || hasFollowBtn(el, r.top)) {
+        if (junkIn(el) || hasAdToken(visText(el, 300, r.top - 2, r.top + 130)) || hasFollowBtn(el, r.top)) {
           r0.v = "junk";
           retire(el, r0);
           continue;

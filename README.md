@@ -85,6 +85,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.13.0
+
+- **Ads whose label is not its own element were missed.** The exact-label match added in 8.12.7 requires an element whose own text is 40 characters or fewer and normalises to exactly `ad`. On desktop the header often renders as one string — `Sam Despo Marketing and ElevenLabs Ad · 🌐` — so the smallest matching element is longer than the cap and was skipped entirely, while the substring list never contained `ad` because it would match _read_, _load_ and _download_. Both real ads reported from a live desktop feed, from Sam Despo Marketing and from Hilton, were labelled this way. The header band's reconstructed text is now split on non-letter boundaries and each **whole token** is compared against the ad labels, which catches the label wherever it sits in the header without ever matching a word that merely contains those letters.
+- Applied to the mobile path as well, so a label that stops being its own element there is still caught.
+- Verified the rejections that matter: `Adam Shaheen and friends read the advice and loaded it` stays, as do `Read and download the guide` and `Ahmed loaded the advice column`.
+
 ### 8.12.9
 
 - **Desktop ad labels are scrambled, so reading `textContent` was useless.** Facebook renders the desktop `Sponsored` label as individual characters in the wrong DOM order, interleaved with hidden decoy letters and U+034F joiners, and paints them in the correct order with CSS. Read from the accessibility tree it says `Sponsored`; read with `textContent` it says `snopotSdre6th49…`. The exact-label check added in 8.12.8 compared against `textContent`, so it could never have matched a real desktop ad. It now also compares the text `visText` reconstructs — which drops invisible nodes and sorts by painted position — so the label is read as it appears on screen. Pinned by a test whose label is scrambled the same way.
