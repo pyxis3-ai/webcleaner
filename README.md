@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.7
+
+- **Ads labelled "Ad" were never matched.** The sponsored detector holds words like `sponsored`, `publicidad` and `ممول` and looks for them as substrings, which cannot include the two-letter label Facebook now uses on the mobile feed and Reels — searching for `ad` inside text would hit _read_, _load_, _download_ and _Adam_. Caught on a real iPhone on a 7UP reel rendering as `7UP … Learn more … Ad`. Short ad labels are now matched as whole words against the element's own text, the same exact-match mechanism the Reels and Stories tray headers already used, in 26 languages. Verified that `Adam`, `read`, `load` and `advice` are still kept.
+- The exact-match list was previously gated on `hideReelsTrays`, which is unrelated to advertising; ad labels are gated on `hideSponsored` where they belong.
+
 ### 8.12.6
 
 - **Reels could not be scrolled at all.** 8.12.5 removed junk from the mobile feed but still hid it in Reels, and a `display:none` child of a scroll-snap container loses its snap point. With eight or nine slots hidden the scroller had almost nothing left to snap to, so every swipe snapped straight back. Measured on a real iPhone across five swipes: with the module on, `scrollTop` stayed at **0** every time and only **2** slots were visible; with it off, `scrollTop` advanced 1290 → 2580 → 3870 → 7740 with 10–14 visible. Reels now retires nodes the same way the feed does.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.6
+// @version      8.12.7
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -164,7 +164,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.6";
+  const VERSION = "8.12.7";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1484,7 +1484,11 @@
       ...(f.hidePeopleYouMayKnow ? ["peopleyoumayknow"] : []),
       ...f.extraJunkPhrases.map(norm),
     ];
-    const EXACT = f.hideReelsTrays ? ["reels", "reelsandshortvideos", "stories"] : [];
+    const AD_LABELS =
+      "ad ads anuncio anuncios annonce anzeige werbung pubblicita annuncio advertentie reklam reklama reklame hirdetes mainos διαφημιση إعلان اعلان реклама 広告 광고 广告 廣告 প্রচারিত publicidade patrocinado"
+        .split(" ")
+        .map(norm);
+    const EXACT = [...(f.hideSponsored ? AD_LABELS : []), ...(f.hideReelsTrays ? ["reels", "reelsandshortvideos", "stories"] : [])];
 
     (() => {
       const X = "html.fcf-s ";
