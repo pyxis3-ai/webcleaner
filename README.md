@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.8
+
+- **The "Ad" label fix now works on desktop too.** 8.12.7 matched short ad labels against each element's own text, which the mobile sweep does, but the desktop sweep tests the header band as one concatenated string — so an ad rendering as `7UP … Ad` arrived as `7upad` and the exact match could never fire. Desktop now runs the same element-wise scan, restricted to the same 130px header band it already used, so a stray `Ad` further down a story — in a comment, say — still does not remove the post. Verified both directions on a synthetic desktop shell: header `Ad`, `Sponsored` and `إعلان` removed; an `Ad` below the band, and a post reading "Adam said read the load", kept.
+- `junkIn` takes an optional band rather than gaining a second copy for desktop, matching how `visText` already works.
+
 ### 8.12.7
 
 - **Ads labelled "Ad" were never matched.** The sponsored detector holds words like `sponsored`, `publicidad` and `ممول` and looks for them as substrings, which cannot include the two-letter label Facebook now uses on the mobile feed and Reels — searching for `ad` inside text would hit _read_, _load_, _download_ and _Adam_. Caught on a real iPhone on a 7UP reel rendering as `7UP … Learn more … Ad`. Short ad labels are now matched as whole words against the element's own text, the same exact-match mechanism the Reels and Stories tray headers already used, in 26 languages. Verified that `Adam`, `read`, `load` and `advice` are still kept.
