@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.14.0
+// @version      8.15.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -165,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.14.0";
+  const VERSION = "8.15.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1646,6 +1646,38 @@
       }
     }
 
+    function hideLabelledAds() {
+      const main = q('[role="main"]');
+      if (!main) return;
+      const vh = innerHeight;
+      let hid = 0;
+      for (const e of main.querySelectorAll('span,a,h3,h4,div[role="heading"]')) {
+        if (hid >= 8) break;
+        const raw = (e.textContent || "").trim();
+        if (!raw || raw.length > 40) continue;
+        const t = norm(raw);
+        if (!t || !(EXACT.includes(t) || MARKS.some((m) => m && t.includes(m)))) continue;
+        if (e.closest('[role="complementary"]')) continue;
+        const er = e.getBoundingClientRect();
+        if (!er.height || er.bottom < -400 || er.top > vh + 400) continue;
+        let n = e,
+          story = null;
+        for (let i = 0; i < 18 && n.parentElement; i++) {
+          n = n.parentElement;
+          if (n === main || n === document.body) break;
+          const r = n.getBoundingClientRect();
+          if (r.width >= 400 && r.height >= 150 && er.top - r.top <= 160) {
+            story = n;
+            break;
+          }
+        }
+        if (!story || rec(story).v) continue;
+        story.setAttribute("data-fcf", "");
+        Object.assign(rec(story), { v: "junk", hidden: true });
+        hid++;
+      }
+    }
+
     function processCards() {
       const scope = q('[role="main"]');
       if (!scope) return;
@@ -2003,6 +2035,7 @@
         if (hasDesktopShell()) {
           hideLeftNav();
           if (isClean()) keepScrollAnchored(processDesktop);
+          hideLabelledAds();
           keepScrollAnchored(processCards);
         } else if (isFeed() && scanDue()) {
           hideTrayRows();
