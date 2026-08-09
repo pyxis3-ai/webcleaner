@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.17.0
+// @version      8.18.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -165,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.17.0";
+  const VERSION = "8.18.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1479,7 +1479,7 @@
         .split(" ")
         .map(norm);
     const AI_MARKS =
-      "aigenerated generatedbyai imaginedwithai madewithai createdwithai aiinfo metaai askmetaai trymetaai aistudio poweredbyai chatwithai aiimage aigeneratedcontent contenidogeneradoconia genereparlia mitkigeneriert محتوىمولدبالذكاءالاصطناعي"
+      "aicontent aigenerated generatedbyai imaginedwithai madewithai createdwithai aiinfo aigeneratedcontent metaai askmetaai trymetaai aistudio poweredbyai chatwithai aiimage contenidodeia contenidogeneradoconia contenuia genereparlia kiinhalt mitkigeneriert aiコンテンツ ai콘텐츠 محتوىالذكاءالاصطناعي محتوىمولدبالذكاءالاصطناعي"
         .split(" ")
         .map(norm);
     const MARKS = [

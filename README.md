@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.18.0
+
+- **Facebook's actual AI label is `AI content`, which was never matched.** The list added in 8.14.0 carried `AI generated`, `Imagined with AI`, `Meta AI` and even `AI generated content`, but not the two-word label Facebook actually renders — seen in the feed as `ADHD Treatment · AI content · 2m`. Added, along with localised equivalents. Since AI markers share the junk-marker path, this covers the feed and Reels on both desktop and mobile at once.
+- Re-checked the false-positive guards: Dubai, chair, email, captain, Air India and advice are all still kept, as is a post that merely discusses AI in its body, because only short label-like elements are examined and the markers are multi-word.
+
 ### 8.17.0
 
 - **Reads the desktop label as painted, instead of guessing from structure.** 8.16.0 treated "many spans plus a U+034F joiner" as an ad signal, which was wrong in the most dangerous direction: reverse-engineering the live DOM showed _every_ post header is built that way — organic posts carry the identical 60-joiner obfuscation around their timestamp. That heuristic would have hidden genuine posts.
