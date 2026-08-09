@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.12.9
+
+- **Desktop ad labels are scrambled, so reading `textContent` was useless.** Facebook renders the desktop `Sponsored` label as individual characters in the wrong DOM order, interleaved with hidden decoy letters and U+034F joiners, and paints them in the correct order with CSS. Read from the accessibility tree it says `Sponsored`; read with `textContent` it says `snopotSdre6th49…`. The exact-label check added in 8.12.8 compared against `textContent`, so it could never have matched a real desktop ad. It now also compares the text `visText` reconstructs — which drops invisible nodes and sorts by painted position — so the label is read as it appears on screen. Pinned by a test whose label is scrambled the same way.
+- The scan also covers `a[href]`, because desktop wraps that label in a link rather than a bare span.
+
 ### 8.12.8
 
 - **The "Ad" label fix now works on desktop too.** 8.12.7 matched short ad labels against each element's own text, which the mobile sweep does, but the desktop sweep tests the header band as one concatenated string — so an ad rendering as `7UP … Ad` arrived as `7upad` and the exact match could never fire. Desktop now runs the same element-wise scan, restricted to the same 130px header band it already used, so a stray `Ad` further down a story — in a comment, say — still does not remove the post. Verified both directions on a synthetic desktop shell: header `Ad`, `Sponsored` and `إعلان` removed; an `Ad` below the band, and a post reading "Adam said read the load", kept.

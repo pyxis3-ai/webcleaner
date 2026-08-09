@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.12.8
+// @version      8.12.9
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -164,7 +164,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.12.8";
+  const VERSION = "8.12.9";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -1716,15 +1716,18 @@
 
     function junkIn(el, bt, bb) {
       const banded = bt !== undefined;
-      for (const e of el.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"]')) {
+      for (const e of el.querySelectorAll('span,a[role="link"],h3,h4,div[role="heading"],a[href]')) {
         const raw = (e.textContent || "").trim();
-        if (!raw || raw.length > 40) continue;
+        if (!raw || raw.length > 120) continue;
         if (banded) {
           const r = e.getBoundingClientRect();
           if (!r.height || r.top < bt || r.top > bb) continue;
         }
-        const t = norm(raw);
-        if (t && isJunk(t)) return true;
+        if (raw.length <= 40 && isJunk(norm(raw))) return true;
+        // Facebook scrambles the label's character order and interleaves invisible
+        // joiners, so textContent is meaningless; visText rebuilds what is painted.
+        const seen = norm(visText(e, 60));
+        if (seen && seen.length <= 40 && isJunk(seen)) return true;
       }
       return false;
     }
