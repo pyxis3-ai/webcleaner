@@ -85,6 +85,11 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.16.0
+
+- **Desktop "Sponsored" labels are scrambled beyond any text matching.** Facebook renders them as roughly sixty one-character spans in deliberately wrong DOM order, padded with decoy characters and separated by U+034F grapheme joiners, then paints the correct subset in the right order with CSS. Read from the DOM the label is 59 characters of noise; even `visText`, which reconstructs painted text, recovers only fragments such as `Ado` and `5ms`. Reported from a live feed as a YuMOVE UK post that survived every text-based rule.
+- Since the text is unrecoverable, the **structure** is now the signal: a header element holding 15 or more spans whose combined text carries a U+034F joiner is an obfuscated label, and its story is hidden. No genuine post header is built that way — verified against a control post whose caption is split across many spans without joiners, which is kept.
+
 ### 8.15.0
 
 - **Desktop ads survived because the sweep never looked at them.** `processDesktop` only examines the children of the container `feedBox()` picks, and on the current Facebook DOM that heuristic can select a container holding a handful of elements while the real stories sit elsewhere — measured at four children on a live feed. Any ad outside it was never tested, no matter how good the label matching was. Reported from a real desktop feed: a `Chiltern Railways · Ad` post fully visible with the module running.
