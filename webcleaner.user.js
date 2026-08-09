@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.19.0
+// @version      8.20.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -165,7 +165,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.19.0";
+  const VERSION = "8.20.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -2150,23 +2150,24 @@
             return r;
           }
         };
+        const PW = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
         try {
-          const nat = JSON.parse;
-          JSON.parse = function (...a) {
+          const nat = PW.JSON.parse;
+          PW.JSON.parse = function (...a) {
             return guard(nat.apply(this, a));
           };
         } catch (_) {}
         try {
-          const nrj = Response.prototype.json;
-          Response.prototype.json = function (...a) {
+          const nrj = PW.Response.prototype.json;
+          PW.Response.prototype.json = function (...a) {
             return nrj.apply(this, a).then(guard);
           };
         } catch (_) {}
         for (const prop of ["ytInitialPlayerResponse", "ytInitialData"]) {
           try {
-            if (Object.getOwnPropertyDescriptor(window, prop)) continue;
+            if (Object.getOwnPropertyDescriptor(PW, prop)) continue;
             let held;
-            Object.defineProperty(window, prop, {
+            Object.defineProperty(PW, prop, {
               configurable: true,
               enumerable: true,
               get() {
@@ -2178,7 +2179,7 @@
             });
           } catch (_) {}
         }
-        window.__wcAdPruned = () => pruned;
+        PW.__wcAdPruned = () => pruned;
       })();
     const SEL = {
       ban: "#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,ytm-companion-slot,ytm-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",

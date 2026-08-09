@@ -85,6 +85,12 @@ Verified against a live logged-in session. "Feed model" means posts are a vertic
 
 ## Changelog
 
+### 8.20.0
+
+- **YouTube's ad pruning never ran under a sandboxing script manager.** The module installs an accessor over `ytInitialPlayerResponse` and wraps `JSON.parse` and `Response.prototype.json` so ad payloads are stripped before the player sees them. Those hooks only work in the page's own scope. On iOS the script runs there, so they were live — verified earlier — but Tampermonkey and Violentmonkey run scripts in a sandbox, where `window` is not the page's window, so on desktop the hooks were installed somewhere the page never looked. Confirmed on a live watch page: the script's page marker was absent and `adPlacements`, `playerAds` and `adSlots` were all still present in the player response.
+- The hooks now target `unsafeWindow` where the manager provides it and fall back to `window` where it does not, so the same code reaches the page under both models. No new `@grant` was added: the sandboxing managers already expose `unsafeWindow` alongside the existing grants, and adding it to the header would have pushed the iOS host into the content-script scope that breaks these hooks entirely.
+- DOM-level ad hiding was unaffected throughout — home, search and watch each showed ad elements present and none visible, with search results intact.
+
 ### 8.19.0
 
 - **The desktop feed is one pass again.** It had grown to four overlapping ones — `processDesktop` walking `feedBox()`'s children, `hideLabelledAds` walking labels, `processCards`, and the health rescue — with five different ways of deciding something was an ad. They disagreed, and the gaps between them are where ads lived.
