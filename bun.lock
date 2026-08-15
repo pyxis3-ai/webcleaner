@@ -5,7 +5,7 @@
     "": {
       "name": "webcleaner",
       "devDependencies": {
-        "prettier": "latest",
+        "prettier": "3.9.6",
       },
     },
   },
