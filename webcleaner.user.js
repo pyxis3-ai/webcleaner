@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.20.0
+// @version      8.21.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -58,6 +58,7 @@
       skipReelsAds: true,
       forceMostRecent: true,
       widenFeed: true,
+      hideFeed: false,
       feedMaxWidth: 1100,
       extraJunkPhrases: [],
       toggleHotkey: { ctrl: false, alt: true, shift: true, key: "f" },
@@ -93,6 +94,7 @@
       hideLeftRail: true,
       hideRightRail: true,
       widenFeed: true,
+      hideFeed: false,
       feedMaxWidth: 900,
       showToggleButton: true,
       toggleHotkey: { ctrl: false, alt: true, shift: true, key: "l" },
@@ -165,7 +167,7 @@
   };
 
   const PFX = "wc7_";
-  const VERSION = "8.20.0";
+  const VERSION = "8.21.0";
   const GMNS = typeof GM !== "undefined" && GM ? GM : null;
   const gmModern = !!(GMNS && typeof GMNS.getValue === "function" && typeof GMNS.setValue === "function");
   const gmLegacy = typeof GM_getValue === "function" && typeof GM_setValue === "function";
@@ -940,6 +942,7 @@
       ["Reel ads", "skipReelsAds"],
       ["Most Recent", "forceMostRecent"],
       ["Widen feed", "widenFeed"],
+      ["Hide feed", "hideFeed"],
       ["Button", "showToggleButton"],
     ])}${listBlock("Junk phrases", "facebook", "extraJunkPhrases", "phrase")}<details data-s=fb-adv><summary>Advanced</summary>${numR("Feed max width", "facebook", "feedMaxWidth")}${hkR("facebook")}</details></details>`;
 
@@ -976,6 +979,7 @@
       ["L.rail", "hideLeftRail"],
       ["R.rail", "hideRightRail"],
       ["Widen feed", "widenFeed"],
+      ["Hide feed", "hideFeed"],
       ["Button", "showToggleButton"],
     ])}<details data-s=li-adv><summary>Advanced</summary>${numR("Feed max width", "linkedin", "feedMaxWidth")}${hkR("linkedin")}</details></details>`;
 
@@ -1441,6 +1445,29 @@
     );
   }
 
+  const feedHider = (attr) => {
+    let held = null;
+    const api = (on, find) => {
+      if (held && !held.isConnected) held = null;
+      if (!on) {
+        if (held) {
+          held.removeAttribute(attr);
+          held = null;
+        }
+        return null;
+      }
+      if (!held) {
+        const found = q(`[${attr}]`) || find();
+        if (!found) return null;
+        held = found;
+        if (held.getAttribute(attr) === null) held.setAttribute(attr, "");
+      }
+      return held;
+    };
+    api.held = () => held;
+    return api;
+  };
+
   const MODULES = {
     facebook: { style: "fcf-css", btn: "fcf-btn" },
     youtube: { style: "yt-css", btn: "yt-btn" },
@@ -1511,6 +1538,7 @@
       if (f.hideReelsTrays) R.push(`${X}[aria-label="Stories"],${X}[aria-label="Reels"]{display:none!important}`);
       if (f.hideComments) R.push(`${X}[aria-label="Leave a comment"],${X}[aria-label^="Comment"]{display:none!important}`);
       if (f.hideLikeCounts) R.push(`${X}[aria-label^="Like:"],${X}[aria-label*="reaction"],${X}[aria-label*="reacted"]{display:none!important}`);
+      if (f.hideFeed) R.push(`${X}[data-fcf-gone]{display:none!important}`);
       if (f.widenFeed) {
         const W = f.feedMaxWidth;
         R.push(
@@ -1627,10 +1655,6 @@
       return best;
     }
 
-    // Facebook paints the desktop label from ~60 one-character spans in scrambled DOM
-    // order, padded with decoys stacked at a single x on a second line. The characters
-    // that actually render sit on the topmost line at distinct x, so reading the boxes
-    // recovers the real word where textContent and naive text walking cannot.
     const ZW = /[\u034F\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/g;
     const HAS_ZW = /[\u034F\u200b-\u200f\u202a-\u202e\ufeff\u00ad\u2060]/;
     function paintedLabel(el) {
@@ -1689,9 +1713,6 @@
       return null;
     }
 
-    // One desktop pass: find the label, climb to its story, retire it. Deliberately not
-    // routed through feedBox — that heuristic picks a single container and any story
-    // outside it was never examined, which is how ads survived every text fix.
     function processDesktop() {
       const main = q('[role="main"]');
       if (!main) return;
@@ -1789,16 +1810,25 @@
       return out;
     }
 
+    function hideMobileFeed(on) {
+      if (!on) {
+        for (const el of document.querySelectorAll("[data-fcf-gone]")) el.removeAttribute("data-fcf-gone");
+        return false;
+      }
+      let n = 0;
+      for (const s of feedSlots()) {
+        if (s.getAttribute("data-fcf-gone") === null) s.setAttribute("data-fcf-gone", "");
+        n++;
+      }
+      return n > 0;
+    }
+
     function retire(el, r0) {
       if (hasDesktopShell()) {
         el.setAttribute("data-fcf", "");
         r0.hidden = true;
         return;
       }
-      // Both mobile surfaces need the node gone rather than hidden: the feed virtualiser
-      // keeps a display:none slot in its height bookkeeping as a zero-height row and stops
-      // loading, and in Reels a display:none child of the scroll-snap container loses its
-      // snap point, so the scroller cannot advance past it.
       try {
         el.remove();
       } catch (_) {
@@ -1817,8 +1847,6 @@
           if (!r.height || r.top < bt || r.top > bb) continue;
         }
         if (raw.length <= 40 && isJunk(norm(raw))) return true;
-        // Facebook scrambles the label's character order and interleaves invisible
-        // joiners, so textContent is meaningless; visText rebuilds what is painted.
         const seen = norm(visText(e, 60));
         if (seen && seen.length <= 40 && isJunk(seen)) return true;
       }
@@ -2067,20 +2095,29 @@
       }
     }
 
+    const hideFeedNode = feedHider("data-fcf-gone");
+
     function sweep() {
       if (!f.enabled) return;
       try {
         if (f.stripTracking) cleanLinks();
-        document.documentElement.classList.toggle("fcf-s", isFeed());
+        const onFeed = isFeed();
+        document.documentElement.classList.toggle("fcf-s", onFeed);
+        const want = f.hideFeed && onFeed;
+        if (hasDesktopShell() ? !!hideFeedNode(want, feedBox) : hideMobileFeed(want)) {
+          hideLeftNav();
+          return;
+        }
         keepScrollAnchored(() => {
           processMobile();
         });
         handleReels();
         if (hasDesktopShell()) {
           hideLeftNav();
+          if (f.widenFeed) feedBox();
           if (isClean()) keepScrollAnchored(processDesktop);
           keepScrollAnchored(processCards);
-        } else if (isFeed() && scanDue()) {
+        } else if (onFeed && scanDue()) {
           hideTrayRows();
           hideMobileChrome();
         }
@@ -2410,13 +2447,16 @@
 
   function initLI() {
     const L = C.linkedin;
-    const LR = ["[data-li-h]{display:none!important}", "[data-li-rail]{display:none!important}"];
+    const LR = ["[data-li-h]{display:none!important}", "[data-li-rail]{display:none!important}", "[data-li-gone]{display:none!important}"];
     if (L.widenFeed) {
       const W = L.feedMaxWidth;
       LR.push(`[data-li-feed]{width:min(${W}px,97vw)!important;max-width:none!important;margin:0 auto!important}`, `[data-li-feed]>*{width:100%!important;max-width:none!important}`);
     }
     addStyle("li-css", LR.join("\n"));
     if (!L.enabled) document.getElementById("li-css").disabled = true;
+
+    const onLIFeed = () => /^\/feed(\/|$)/.test(location.pathname);
+    const hideLIFeed = feedHider("data-li-gone");
 
     let _liFeed = null;
     function tagTopBar() {
@@ -2428,22 +2468,30 @@
     }
     function tagChrome() {
       tagTopBar();
-      const fhi = Math.max(760, Math.min(innerWidth * 0.8, 1400));
-      let feed = null,
-        fscore = 0;
-      for (const e of document.querySelectorAll("div,main,section")) {
-        const r = e.getBoundingClientRect();
-        if (r.width < 380 || r.width > fhi || r.height < 400) continue;
-        if ((e.innerText || "").length < 500) continue;
-        if (!feed || r.width < feed.getBoundingClientRect().width) {
-          fscore = 1;
-          feed = e;
+      if (!hideLIFeed.held()) {
+        const fhi = Math.max(760, Math.min(innerWidth * 0.8, 1400));
+        const flo = Math.min(380, innerWidth * 0.9);
+        let found = null,
+          fscore = 0;
+        for (const e of document.querySelectorAll("div,main,section")) {
+          const r = e.getBoundingClientRect();
+          if (r.width < flo || r.width > fhi || r.height < 400) continue;
+          if ((e.innerText || "").length < 500) continue;
+          if (!found) {
+            fscore = 1;
+            found = e;
+            continue;
+          }
+          const fw = found.getBoundingClientRect().width;
+          if (r.width < fw || (r.width === fw && found.contains(e) && e.children.length > found.children.length)) found = e;
+        }
+        if (fscore && found) {
+          _liFeed = found;
+          if (L.widenFeed && found.getAttribute("data-li-feed") === null) found.setAttribute("data-li-feed", "");
         }
       }
-      if (!fscore) feed = null;
+      const feed = _liFeed;
       if (!feed) return;
-      _liFeed = feed;
-      if (L.widenFeed && feed.getAttribute("data-li-feed") === null) feed.setAttribute("data-li-feed", "");
       for (const e of document.querySelectorAll("aside")) {
         if (e.hasAttribute("data-li-rail")) continue;
         if (e === feed || e.contains(feed) || feed.contains(e)) continue;
@@ -2464,6 +2512,7 @@
       const lo = 280,
         hi = Math.max(innerWidth * 0.9, 700);
       tagChrome();
+      if (hideLIFeed(L.hideFeed && onLIFeed(), () => _liFeed)) return;
       if (!MK.length) return;
       let hid = 0;
       for (const el of document.querySelectorAll("div,article,section,li")) {
