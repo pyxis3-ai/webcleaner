@@ -2471,21 +2471,23 @@
       if (!hideLIFeed.held()) {
         const fhi = Math.max(760, Math.min(innerWidth * 0.8, 1400));
         const flo = Math.min(380, innerWidth * 0.9);
+        const chrome = q("header,nav,[role='banner'],[role='navigation']");
         let found = null,
-          fscore = 0;
+          fkids = 0,
+          fw = 0;
         for (const e of document.querySelectorAll("div,main,section")) {
           const r = e.getBoundingClientRect();
           if (r.width < flo || r.width > fhi || r.height < 400) continue;
           if ((e.innerText || "").length < 500) continue;
-          if (!found) {
-            fscore = 1;
+          if (chrome && e.contains(chrome)) continue;
+          const kids = e.children.length;
+          if (kids > fkids || (kids === fkids && found && r.width < fw)) {
             found = e;
-            continue;
+            fkids = kids;
+            fw = r.width;
           }
-          const fw = found.getBoundingClientRect().width;
-          if (r.width < fw || (r.width === fw && found.contains(e) && e.children.length > found.children.length)) found = e;
         }
-        if (fscore && found) {
+        if (found) {
           _liFeed = found;
           if (L.widenFeed && found.getAttribute("data-li-feed") === null) found.setAttribute("data-li-feed", "");
         }
