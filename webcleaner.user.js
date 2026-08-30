@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Web Cleaner
 // @namespace    https://local/webcleaner
-// @version      8.21.0
+// @version      8.22.0
 // @updateURL    https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @downloadURL  https://raw.githubusercontent.com/pyxis3-ai/webcleaner/main/webcleaner.user.js
 // @match        *://*/*
@@ -82,7 +82,7 @@
       hideMerch: true,
       hideLiveChat: false,
       widenPlayer: true,
-      seekPastAds: true,
+      seekPastAds: false,
       showToggleButton: true,
       toggleHotkey: { ctrl: false, alt: true, shift: true, key: "y" },
     },
@@ -966,7 +966,7 @@
       ["Merch/promos", "hideMerch"],
       ["Live chat", "hideLiveChat"],
       ["Widen player", "widenPlayer"],
-      ["Seek past ads", "seekPastAds"],
+      ["Seek past ads ⚠", "seekPastAds"],
       ["Button", "showToggleButton"],
     ])}<details data-s=yt-adv><summary>Advanced</summary>${hkR("youtube")}</details></details>`;
 
@@ -2148,10 +2148,86 @@
 
     if (y.blockAdData)
       (() => {
-        const AD_KEYS = ["adPlacements", "playerAds", "adSlots"];
-        let pruned = 0;
+        // ---------------------------------------------------------------------
+        // Ad payload filter.
+        //
+        // Everything here is shaped by what the desktop bundle actually checks.
+        // Three of its detectors decide the design:
+        //
+        //   j.s_  (CATSTAT bit 2)  a canary JSON string and its expected parsed
+        //                          object are baked into the bundle; the client
+        //                          runs JSON.parse over the canary and deep-compares.
+        //                          The canary contains adPlacements and adSlots, so
+        //                          ANY JSON.parse hook that prunes ad keys fails it.
+        //                          Nothing here patches JSON.parse.
+        //   _.QeL                  the same canary through `new Response(str).json()`.
+        //                          A synthetic Response has url === "", a real one
+        //                          does not, so the hook below only acts on a URL
+        //                          that came off the network.
+        //   NMP                    a data: URL Request whose `url`, `method`, `mode`
+        //                          and `bodyUsed` getters are overridden to claim it
+        //                          is POST /youtubei/v1/player. Matching on the
+        //                          REQUEST url walks into it; Response.url reports the
+        //                          real data: URL, so matching on the response does not.
+        //
+        // Hence: no JSON.parse hook, and every interception keys off the URL the
+        // network actually served, never off a URL the page hands us.
+        // ---------------------------------------------------------------------
+        const PLAYER_RE = /\/youtubei\/v[0-9]+\/(player|reel_watch_sequence|next|browse|search)\b/;
+        // Resolve first: YouTube requests these paths relatively, so testing the raw
+        // argument against /^https?:/ would reject every real call. A data: or blob:
+        // URL has no http(s) origin and so still fails, which is what keeps the NMP
+        // honeypot out.
+        const abs = (u) => {
+          try {
+            return new URL(String(u), location.href).href;
+          } catch (_) {
+            return "";
+          }
+        };
+        const fromNetwork = (u) => {
+          const h = abs(u);
+          return /^https?:/.test(h) && PLAYER_RE.test(h);
+        };
+
+        // msy(playerResponse) in base.js is true when a placement of kind
+        // AD_PLACEMENT_KIND_START exists, or a slot triggers on
+        // SLOT_TRIGGER_EVENT_BEFORE_CONTENT. When a SABR context update of type 5
+        // arrives and msy() is false the player records m.p_ / MBSTAT and raises
+        // onAbnormalityDetected, so deleting adPlacements outright announces the
+        // prune. A session with nothing to serve still carries one placement, a
+        // clientForecastingAdRenderer at KIND_START; that is the shape left behind.
+        const DROP_KEYS = ["playerAds", "adSlots"];
+        const isStart = (p) => p?.adPlacementRenderer?.config?.adPlacementConfig?.kind === "AD_PLACEMENT_KIND_START";
+        const prunePlacements = (o) => {
+          if (!Array.isArray(o.adPlacements)) return;
+          const start = o.adPlacements.find(isStart);
+          o.adPlacements = start ? [{ adPlacementRenderer: { config: start.adPlacementRenderer.config, renderer: { clientForecastingAdRenderer: {} } } }] : [];
+        };
+        // Both enforcement paths in the desktop bundle are gated on U2L(playerResponse),
+        // which reads auxiliaryUi.messageRenderers.bkaEnforcementMessageViewModel. The
+        // onAbnormalityDetected handler only stops the video and rewrites
+        // playabilityStatus to {status:"ERROR", errorScreen:{enforcementMessageViewModel}}
+        // `if (S = U2L(f))`, and the popup path only calls n0r() when that renderer
+        // exists. Dropping it therefore disarms the enforcement itself, not merely the
+        // dialog -- and because the popup never opens, xUU()/o49() never run, so p.h_
+        // is never reported at all.
+        const dropEnforcement = (o) => {
+          const m = o.auxiliaryUi?.messageRenderers;
+          if (m && "bkaEnforcementMessageViewModel" in m) {
+            try {
+              delete m.bkaEnforcementMessageViewModel;
+            } catch (_) {}
+          }
+          const es = o.playabilityStatus?.errorScreen;
+          if (es && "enforcementMessageViewModel" in es) {
+            try {
+              delete es.enforcementMessageViewModel;
+            } catch (_) {}
+          }
+        };
         const scrub = (o, d) => {
-          if (!o || typeof o !== "object" || d > 14) return o;
+          if (!o || typeof o !== "object" || d > 8) return o;
           if (Array.isArray(o)) {
             for (let i = o.length - 1; i >= 0; i--) {
               const e = o[i];
@@ -2161,18 +2237,18 @@
               } catch (_) {}
               if (isAd) {
                 o.splice(i, 1);
-                pruned++;
                 continue;
               }
               scrub(e, d + 1);
             }
             return o;
           }
-          for (const k of AD_KEYS)
+          if ("adPlacements" in o) prunePlacements(o);
+          if ("auxiliaryUi" in o || "playabilityStatus" in o) dropEnforcement(o);
+          for (const k of DROP_KEYS)
             if (k in o) {
               try {
                 delete o[k];
-                pruned++;
               } catch (_) {}
             }
           for (const k in o) {
@@ -2180,26 +2256,28 @@
           }
           return o;
         };
+        const CARRIES_ADS = ["adPlacements", "adSlots", "playerAds", "streamingData", "playerResponse", "reelWatchSequenceResponse", "entries", "auxiliaryUi", "playabilityStatus"];
         const guard = (r) => {
           try {
-            return scrub(r, 0);
+            return r && typeof r === "object" && CARRIES_ADS.some((k) => k in r) ? scrub(r, 0) : r;
           } catch (_) {
             return r;
           }
         };
+        const guardText = (t) => {
+          if (typeof t !== "string" || t.length < 2) return t;
+          try {
+            const o = JSON.parse(t);
+            return o && typeof o === "object" ? JSON.stringify(guard(o)) : t;
+          } catch (_) {
+            return t;
+          }
+        };
+
         const PW = typeof unsafeWindow !== "undefined" && unsafeWindow ? unsafeWindow : window;
-        try {
-          const nat = PW.JSON.parse;
-          PW.JSON.parse = function (...a) {
-            return guard(nat.apply(this, a));
-          };
-        } catch (_) {}
-        try {
-          const nrj = PW.Response.prototype.json;
-          PW.Response.prototype.json = function (...a) {
-            return nrj.apply(this, a).then(guard);
-          };
-        } catch (_) {}
+
+        // The initial payload is assigned by an inline script, so an accessor on the
+        // global catches it without touching JSON.parse.
         for (const prop of ["ytInitialPlayerResponse", "ytInitialData"]) {
           try {
             if (Object.getOwnPropertyDescriptor(PW, prop)) continue;
@@ -2216,10 +2294,95 @@
             });
           } catch (_) {}
         }
-        PW.__wcAdPruned = () => pruned;
+
+        // Every replacement below is a Proxy over the native rather than a fresh
+        // function. A Proxy forwards `name`, `length` and the absence of `.prototype`
+        // to its target, its own-property list is the target's, and -- measured --
+        // `Function.prototype.toString` on it returns "function () { [native code] }".
+        // So the whole passive shape matches without patching
+        // Function.prototype.toString globally, which is what uBlock's proxyApplyFn
+        // has to do only because it chains many proxies. Neither bundle actually runs
+        // a toString integrity check for ad-block detection -- the six "[native code]"
+        // tests in the desktop bundle are Zone.js, Closure and gapi polyfill probes
+        // over Node/Element/ShadowRoot/MutationObserver -- so this is shape hygiene,
+        // not a defence against a check known to exist.
+        const asNative = (native, handler) => {
+          try {
+            return new Proxy(native, { apply: handler });
+          } catch (_) {
+            return native;
+          }
+        };
+
+        // fetch path. `this.url` is empty for a synthetic Response and reports the
+        // real data: URL for the NMP honeypot, so both pass through untouched.
+        try {
+          const nrj = PW.Response.prototype.json;
+          PW.Response.prototype.json = asNative(nrj, (t, self, args) => {
+            const p = Reflect.apply(t, self, args);
+            let u = "";
+            try {
+              u = self.url;
+            } catch (_) {}
+            return fromNetwork(u) ? p.then(guard) : p;
+          });
+        } catch (_) {}
+
+        // XHR path. The URL is captured at open() time in a WeakMap rather than read
+        // back from responseURL, because responseURL is an accessor a page can
+        // redefine on its own instance -- the same trick NMP plays on Request.
+        try {
+          const XP = PW.XMLHttpRequest.prototype;
+          const seen = new WeakMap();
+          const nOpen = XP.open;
+          XP.open = asNative(nOpen, (t, self, args) => {
+            try {
+              seen.set(self, String(args[1]));
+            } catch (_) {}
+            return Reflect.apply(t, self, args);
+          });
+          const nSend = XP.send;
+          XP.send = asNative(nSend, (t, self, args) => {
+            try {
+              // The gate is the URL recorded inside our own open() wrapper, before the
+              // page could touch this instance. responseURL is only consulted as a
+              // second opinion: it is an accessor a page can redefine on its own
+              // object, so it can veto but never widen.
+              if (fromNetwork(seen.get(self)))
+                self.addEventListener("readystatechange", function () {
+                  if (this.readyState !== 4) return;
+                  let real = "";
+                  try {
+                    real = this.responseURL;
+                  } catch (_) {}
+                  if (real && !fromNetwork(real)) return;
+                  let txt = "";
+                  try {
+                    txt = this.responseText;
+                  } catch (_) {
+                    return;
+                  }
+                  const out = guardText(txt);
+                  if (out === txt) return;
+                  try {
+                    Object.defineProperty(this, "responseText", { configurable: true, get: () => out });
+                    Object.defineProperty(this, "response", { configurable: true, get: () => out });
+                  } catch (_) {}
+                });
+            } catch (_) {}
+            return Reflect.apply(t, self, args);
+          });
+        } catch (_) {}
       })();
     const SEL = {
-      ban: "#masthead-ad,#player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,ytm-companion-slot,ytm-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",
+      // #masthead-ad and #player-ads are scoped to the app root. The desktop
+      // bundle builds bait elements from an obfuscated table and appends them
+      // straight to <body>: a bare <div id="player-ads"> and a nested chain ending
+      // in <div class="ytd-ad-slot-renderer">, then scores getComputedStyle(inner)
+      // .display === "none" as detected (signal e.h_, CATSTAT bit 6). Measured: the
+      // unscoped #player-ads rule matched the bait and tripped it; the tag selectors
+      // did not, because the bait carries those names as classes on a div.
+      ban: "ytd-app #masthead-ad,ytm-app #masthead-ad,ytd-app #player-ads,ytm-app #player-ads,ytmusic-app #player-ads,ytd-banner-promo-renderer,ytd-statement-banner-renderer,ytd-companion-slot-renderer,ytd-action-companion-ad-renderer,ytm-companion-slot,ytm-companion-ad-renderer,.ytp-ad-overlay-slot,.ytp-ad-overlay-container,.ytp-ad-image-overlay",
       feed: "ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-display-ad-renderer,ytd-promoted-video-renderer,ytd-promoted-sparkles-web-renderer,ytd-search-pyv-renderer,ytm-companion-slot,ytm-companion-ad-renderer,ytm-promoted-video-renderer,ytm-search-pyv-renderer,ytm-promoted-sparkles-web-renderer,ad-slot-renderer,ad-disclosure-banner-view-model",
       wrap: "ytd-rich-item-renderer,ytd-rich-section-renderer,ytd-item-section-renderer,ytm-rich-item-renderer,ytm-rich-section-renderer,ytm-item-section-renderer,ytm-media-item",
       skip: ".ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button,.ytp-ad-skip-button-container button,.ytp-ad-skip-ad-slot button",
@@ -2253,6 +2416,12 @@
         "ytd-guide-entry-renderer:has(a[href^='/shorts'])",
         "ytd-mini-guide-entry-renderer:has(a[href^='/shorts'])",
         "ytm-pivot-bar-item-renderer:has(a[href^='/shorts'])",
+      );
+    if (y.dismissAntiAdblock)
+      rules.push(
+        // display:block, not display:none -- see the p.h_ note in tick().
+        "ytd-enforcement-message-view-model{display:block!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;position:fixed!important;left:-99999px!important;top:-99999px!important;width:1px!important;height:1px!important;overflow:hidden!important}",
+        "tp-yt-paper-dialog:has(ytd-enforcement-message-view-model),tp-yt-iron-overlay-backdrop{display:none!important}",
       );
     if (y.hideEndCards) rules.push(".ytp-ce-element", ".ytp-endscreen-content");
     if (y.hideInfoCards) rules.push(".ytp-cards-teaser", ".ytp-card-content", ".ytp-suggested-action");
@@ -2316,45 +2485,12 @@
 
     let muted = false,
       lastShort = 0,
-      adTicks = 0,
-      lastTap = 0;
+      adTicks = 0;
     const _dismissedEnf = new WeakSet();
     interceptNav(() => {
       lastShort = 0;
       adTicks = 0;
     });
-
-    function tap(el) {
-      try {
-        el.click();
-      } catch (_) {}
-      const r = el.getBoundingClientRect(),
-        cx = r.left + r.width / 2,
-        cy = r.top + r.height / 2;
-      const o = { bubbles: true, cancelable: true, composed: true, clientX: cx, clientY: cy, view: window };
-      const P = (t) => {
-        try {
-          el.dispatchEvent(new PointerEvent(t, { ...o, pointerType: "touch", isPrimary: true, pointerId: 1 }));
-        } catch (_) {}
-      };
-      const M = (t) => {
-        try {
-          el.dispatchEvent(new MouseEvent(t, o));
-        } catch (_) {}
-      };
-      const T = (t) => {
-        try {
-          el.dispatchEvent(new TouchEvent(t, { bubbles: true, cancelable: true }));
-        } catch (_) {}
-      };
-      P("pointerdown");
-      T("touchstart");
-      M("mousedown");
-      P("pointerup");
-      T("touchend");
-      M("mouseup");
-      M("click");
-    }
 
     function tick() {
       if (!y.enabled) return;
@@ -2363,7 +2499,13 @@
           const enf = q("ytd-enforcement-message-view-model");
           if (enf && !_dismissedEnf.has(enf)) {
             _dismissedEnf.add(enf);
-            (enf.closest("tp-yt-paper-dialog") || enf).remove();
+            // The node is deliberately left in the DOM and deliberately not given
+            // display:none. o49() reads getComputedStyle on the first
+            // ytd-enforcement-message-view-model and scores a missing element OR one
+            // computing to display:none as detected (p.h_, bit 12); anything else
+            // scores clean. The stylesheet keeps it display:block and takes it out of
+            // sight by other means, so only the dialog shell and backdrop are removed.
+            enf.closest("tp-yt-paper-dialog")?.style.setProperty("display", "none", "important");
             q("tp-yt-iron-overlay-backdrop")?.remove();
             document.body?.style.removeProperty("overflow");
             const vi = q("video");
@@ -2378,15 +2520,21 @@
           if (adActive) {
             adTicks++;
             const sk = q(SEL.skip);
-            if (sk && Date.now() - lastTap > 400) {
-              lastTap = Date.now();
-              tap(sk);
-            }
+            // The skip button is deliberately not clicked. base.js routes both skip
+            // buttons through lc5(event): an event whose isTrusted is false scores 0,
+            // which raises onAbnormalityDetected and bypasses the super.onClick() that
+            // would have performed the skip. A scripted click is therefore reported
+            // and refused -- it costs a detection and buys nothing. Removing the ad
+            // payload before the player sees it is what actually skips the ad.
             if (v) {
               if (y.muteAds && !v.muted) {
                 v.muted = true;
                 muted = true;
               }
+              // Seeking inside an ad is reported unconditionally: sHY() calls
+              // xV(0, "a.s_") on any seek while videoData.isAd(), and collapsing a 30s
+              // ad into one frame also trips n.k_ / NKDSTAT, which is folded into the
+              // attestation ping. Off by default for that reason.
               if (y.seekPastAds && isFinite(v.duration) && v.duration > 1 && v.duration <= 180 && (!sk || adTicks >= 3)) v.currentTime = v.duration - 0.1;
             }
             q(SEL.clos)?.click();
