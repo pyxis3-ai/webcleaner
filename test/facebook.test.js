@@ -77,7 +77,7 @@ test("mobile feed: junk slots are removed, empty cards collapse, chrome and tray
   const p = await open({ url: FEED_URL, html: fixture("fb-mobile.html"), ...MOBILE });
   await p.waitForFunction(() => !document.getElementById("s-sponsored") && !document.getElementById("empty"));
   await p.waitForTimeout(1500);
-  for (const id of ["s-sponsored", "s-adlabel", "s-follow", "empty"]) expect(await p.has("#" + id)).toBe(false);
+  for (const id of ["s-sponsored", "s-adlabel", "s-follow", "s-addfriend", "empty"]) expect(await p.has("#" + id)).toBe(false);
   for (const id of ["s-organic", "s-control", "s-stories"]) expect(await p.display("#" + id)).toBe("block");
   for (const sel of ['[role="tablist"]', "#composer", "#tray"]) expect(await p.display(sel)).toBe("none");
   await p.done();
@@ -87,8 +87,8 @@ test("mobile feed: Hide feed tags every slot and removes nothing", async () => {
   const p = await open({ url: FEED_URL, html: fixture("fb-mobile.html"), ...MOBILE, store: { wc7_facebook: { hideFeed: true } } });
   await p.tagged(".displayed[data-fcf-gone]");
   await p.waitForTimeout(1500);
-  expect(await p.evaluate(() => document.querySelectorAll(".displayed").length)).toBe(7);
-  expect(await p.evaluate(() => document.querySelectorAll(".displayed[data-fcf-gone]").length)).toBe(7);
+  expect(await p.evaluate(() => document.querySelectorAll(".displayed").length)).toBe(8);
+  expect(await p.evaluate(() => document.querySelectorAll(".displayed[data-fcf-gone]").length)).toBe(8);
   expect(await p.display(".displayed")).toBe("none");
   expect(await p.display('[role="tablist"]')).toBe("none");
   await p.done();
@@ -97,7 +97,7 @@ test("mobile feed: Hide feed tags every slot and removes nothing", async () => {
 test("mobile feed: a disabled module removes nothing", async () => {
   const p = await open({ url: FEED_URL, html: fixture("fb-mobile.html"), ...MOBILE, store: { wc7_facebook: { enabled: false } } });
   await p.waitForTimeout(2500);
-  expect(await p.evaluate(() => document.querySelectorAll(".displayed").length)).toBe(7);
+  expect(await p.evaluate(() => document.querySelectorAll(".displayed").length)).toBe(8);
   expect(await p.display("#s-sponsored")).toBe("block");
   await p.done();
 });

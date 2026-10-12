@@ -1751,9 +1751,30 @@
     };
 
     const FOLLOW = new Set(
-      ["follow", "seguir", "suivre", "folgen", "segui", "volgen", "takip et", "följ", "følg", "obserwuj", "متابعة", "подписаться", "フォロー", "팔로우", "关注", "關注", ...f.extraJunkPhrases].map(
-        norm,
-      ),
+      [
+        "follow",
+        "seguir",
+        "suivre",
+        "folgen",
+        "segui",
+        "volgen",
+        "takip et",
+        "följ",
+        "følg",
+        "obserwuj",
+        "متابعة",
+        "подписаться",
+        "フォロー",
+        "팔로우",
+        "关注",
+        "關注",
+        "add friend",
+        "join",
+        "join group",
+        "إضافة صديق",
+        "انضمام",
+        ...f.extraJunkPhrases,
+      ].map(norm),
     );
     const onReelsRoute = () => /^\/reels?(\/|$)/.test(location.pathname);
     function hasFollowBtn(post, top) {
