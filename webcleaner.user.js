@@ -1653,22 +1653,24 @@
       "aicontent aigenerated generatedbyai imaginedwithai madewithai createdwithai aiinfo aigeneratedcontent metaai askmetaai trymetaai aistudio poweredbyai chatwithai aiimage contenidodeia contenidogeneradoconia contenuia genereparlia kiinhalt mitkigeneriert aiコンテンツ ai콘텐츠 محتوىالذكاءالاصطناعي محتوىمولدبالذكاءالاصطناعي"
         .split(" ")
         .map(norm);
-    const MARKS = [
-      ...(f.hideAIContent ? AI_MARKS : []),
-      ...(f.hideSponsored ? SPON : []),
+    // Labels are acted on everywhere. Recommendation markers only on feed routes: the Friends page, search and
+    // Marketplace are made of "People you may know", Follow and Add friend, and are the content there.
+    const LABELS_HERE = [...(f.hideAIContent ? AI_MARKS : []), ...(f.hideSponsored ? SPON : []), ...f.extraJunkPhrases.map(norm)];
+    const RECS = [
       ...(f.hideSuggested
         ? ["suggestedforyou", "suggestedpost", "pagesforyou", "pagesyoumaylike", "groupsyoumaylike", "suggestedaccounts", "peopletofollow", "accountstofollow", "pagestofollow"]
         : []),
       ...(f.hidePeopleYouMayKnow ? ["peopleyoumayknow"] : []),
-      ...f.extraJunkPhrases.map(norm),
     ];
     const TRAYS = f.hideReelsTrays ? ["reels", "reelsandshortvideos", "stories"] : [];
     const adTok = f.hideSponsored ? adToken : () => false;
-    const isJunk = (c) => MARKS.some((m) => c.includes(m)) || TRAYS.includes(c) || (f.hideSponsored && AD_WORDS.has(c));
-    const hit = (t) => {
-      const c = norm(t);
-      return MARKS.some((m) => c.includes(m));
+    const isFeedRoute = () => {
+      const pp = location.pathname.replace(/\/$/, "");
+      return isFeed() || /^\/(groups(\/feed|\/[^/]+)?|watch|reels?(\/.*)?)$/.test(pp);
     };
+    const marked = (c) => LABELS_HERE.some((m) => c.includes(m)) || (isFeedRoute() && RECS.some((m) => c.includes(m)));
+    const isJunk = (c) => marked(c) || (f.hideSponsored && AD_WORDS.has(c)) || (isFeedRoute() && TRAYS.includes(c));
+    const hit = (t) => marked(norm(t));
 
     if (f.blockAdData) {
       // Translated from uBlock Origin's maintained Facebook filters: drop `node` from feed edges whose category is
@@ -1778,7 +1780,7 @@
     );
     const onReelsRoute = () => /^\/reels?(\/|$)/.test(location.pathname);
     function hasFollowBtn(post, top) {
-      if (!f.hideFollowSuggestions) return false;
+      if (!f.hideFollowSuggestions || !isFeedRoute()) return false;
       const overlaid = !!post.querySelector("video") || onReelsRoute();
       for (const e of post.querySelectorAll('span,a,div[role="button"]')) {
         const t = (e.textContent || "").trim();
@@ -1793,10 +1795,6 @@
     }
 
     const hasDesktopShell = () => !!q('[role="main"]');
-    const isClean = () => {
-      const pp = location.pathname.replace(/\/$/, "");
-      return isFeed() || pp === "/groups/feed" || pp === "/watch" || /^\/groups\/[^/]+$/.test(pp);
-    };
 
     let _feed = null,
       _skipEl = null,
@@ -1931,7 +1929,7 @@
         if (r0.v) continue;
         const r = st.getBoundingClientRect();
         if (r.height < 60 || r.bottom < -500 || r.top > vh + 500) continue;
-        if (hasFollowBtn(st, r.top) || (f.hideReelsTrays && st.querySelectorAll('a[href*="/reel/"]').length > 3)) hide(st, r0);
+        if (hasFollowBtn(st, r.top) || (f.hideReelsTrays && isFeedRoute() && st.querySelectorAll('a[href*="/reel/"]').length > 3)) hide(st, r0);
         else if (++r0.keep >= 6) r0.v = "keep";
       }
     }
@@ -1942,6 +1940,22 @@
       const vh = innerHeight,
         lim = Math.min(560, innerWidth * 0.55);
       const fits = (rr) => rr.width >= 120 && rr.width <= lim && rr.height >= 80 && rr.height <= 620 && rr.bottom >= -500 && rr.top <= vh + 500;
+      // Marketplace and other grids end a sponsored tile with a bare "Ad"; the tile is its first card-sized ancestor.
+      if (f.hideSponsored)
+        for (const e of scope.querySelectorAll("span,div")) {
+          if (e.children.length || !AD_WORDS.has(norm(e.textContent || "")) || !e.getBoundingClientRect().height) continue;
+          let n = e;
+          for (let i = 0; i < 12 && n.parentElement && n.parentElement !== scope; i++) {
+            n = n.parentElement;
+            const rr = n.getBoundingClientRect();
+            if (rr.width > lim) break;
+            if (fits(rr) && rr.height >= 150) {
+              const st = fresh(n, "data-fcf");
+              if (!st.hidden) hide(n, st);
+              break;
+            }
+          }
+        }
       for (const el of scope.querySelectorAll("div,a")) {
         if (!fits(el.getBoundingClientRect())) continue;
         const r0 = fresh(el, "data-fcf");
@@ -2042,7 +2056,7 @@
           retire(el, r0);
           continue;
         }
-        if (f.hideEmptyCards && !hasContent(el) && r.height >= 80 && (reels || docH - (r.bottom + scrollY) >= LOADER_ZONE)) {
+        if (f.hideEmptyCards && isFeedRoute() && !hasContent(el) && r.height >= 80 && (reels || docH - (r.bottom + scrollY) >= LOADER_ZONE)) {
           if (++r0.empty >= (reels ? 3 : 1)) {
             r0.v = "empty";
             retire(el, r0);
@@ -2270,7 +2284,7 @@
       if (desktop) {
         if (f.widenFeed) feedBox();
         keepScrollAnchored(() => {
-          if (isClean()) processDesktop();
+          processDesktop();
           processCards();
         });
       } else if (onFeed && scanDue()) {
@@ -2280,7 +2294,7 @@
     }
 
     onRoot(() => document.documentElement.classList.toggle("fcf-s", isFeed()));
-    runModule("facebook", { css: R.join("\n"), sweep, fast: f.hideVideoAutoplay ? muteVids : null, every: 1200, rescue: { hit, attr: "data-fcf", armed: () => f.hideSponsored } });
+    runModule("facebook", { css: R.join("\n"), sweep, fast: f.hideVideoAutoplay ? muteVids : null, every: 1200, rescue: { hit: labelled, attr: "data-fcf", armed: () => f.hideSponsored } });
   }
 
   function initYT() {

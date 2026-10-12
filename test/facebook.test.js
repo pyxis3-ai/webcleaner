@@ -69,7 +69,7 @@ test("tile grid: the tightest labelled tile is hidden, rows and hidden-text hone
   await p.tagged("#t2[data-fcf]");
   await p.waitForTimeout(1500);
   const hidden = await p.evaluate(() => [...document.querySelectorAll("[data-fcf]")].map((e) => e.id).sort());
-  expect(hidden).toEqual(["t2", "t5"]);
+  expect(hidden).toEqual(["t2", "t5", "tad"]);
   await p.done();
 });
 
@@ -167,5 +167,24 @@ test("Block ad data off leaves GraphQL responses and natives alone", async () =>
   const r = await p.evaluate(async () => ({ text: await (await fetch("/api/graphql/", { method: "POST", body: "q" })).text(), str: Function.prototype.toString.call(fetch) }));
   expect(r.text).toBe(GRAPHQL);
   expect(r.str).toBe("function fetch() { [native code] }");
+  await p.done();
+});
+
+test("off the feed, ads are still hidden but recommendations are content: mobile Friends keeps Follow and Add friend", async () => {
+  const p = await open({ url: "https://www.facebook.com/friends/", html: fixture("fb-mobile.html"), ...MOBILE });
+  await p.waitForFunction(() => !document.getElementById("s-sponsored"));
+  await p.waitForTimeout(1500);
+  for (const id of ["s-sponsored", "s-adlabel"]) expect(await p.has("#" + id)).toBe(false);
+  for (const id of ["s-follow", "s-addfriend", "s-organic", "s-stories"]) expect(await p.has("#" + id)).toBe(true);
+  expect(await p.has("#empty")).toBe(true);
+  await p.done();
+});
+
+test("off the feed on desktop: search hides labelled ads and keeps Follow results", async () => {
+  const p = await open({ url: "https://www.facebook.com/search/top?q=coffee", html: fixture("fb-desktop.html"), ...TALL });
+  await p.tagged("#s-sponsored[data-fcf]");
+  await p.waitForTimeout(1500);
+  for (const id of ["s-sponsored", "s-adtoken", "s-obf", "s-svglabel"]) expect(await p.display("#" + id)).toBe("none");
+  for (const id of ["s-follow", "s-reels", "s-organic", "s-control"]) expect(await p.display("#" + id)).toBe("block");
   await p.done();
 });
