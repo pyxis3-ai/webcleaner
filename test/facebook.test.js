@@ -7,10 +7,11 @@ const MOBILE = { viewport: { width: 412, height: 2000 }, ua: "Mozilla/5.0 (Linux
 
 test("desktop feed: labelled stories hidden, organic kept, chrome hidden, feed widened, links cleaned", async () => {
   const p = await open({ url: FEED_URL, html: fixture("fb-desktop.html"), ...TALL });
-  await p.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 5);
+  await p.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 6);
   await p.waitForTimeout(1500);
   const hidden = await p.evaluate(() => [...document.querySelectorAll("[data-fcf]")].map((e) => e.id).sort());
-  expect(hidden).toEqual(["s-adtoken", "s-follow", "s-obf", "s-reels", "s-sponsored"]);
+  expect(hidden).toEqual(["s-adtoken", "s-follow", "s-obf", "s-reels", "s-sponsored", "s-svglabel"]);
+  expect(await p.display("#s-tnlink")).toBe("block");
   expect(await p.display("#s-sponsored")).toBe("none");
   expect(await p.display("#s-organic")).toBe("block");
   expect(await p.display("#s-control")).toBe("block");
@@ -24,7 +25,7 @@ test("desktop feed: labelled stories hidden, organic kept, chrome hidden, feed w
 
 test("desktop feed: rotated markup is reported and rescued by rendered text", async () => {
   const p = await open({ url: FEED_URL, html: fixture("fb-desktop.html"), ...TALL });
-  await p.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 5);
+  await p.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 6);
   const panel = await p.panel();
   expect(await panel.locator(".cu").first().textContent()).toContain("1 sponsored label still visible");
   await p.keyboard.press("Escape");
@@ -46,7 +47,7 @@ test("desktop: Hide feed removes the column only, and only on the feed route", a
   expect(await p.has("[data-fcf]")).toBe(false);
   await p.done();
   const q = await open({ url: "https://www.facebook.com/groups/feed/", html: fixture("fb-desktop.html"), ...TALL, store: { wc7_facebook: { hideFeed: true } } });
-  await q.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 5);
+  await q.waitForFunction(() => document.querySelectorAll("[data-fcf]").length >= 6);
   expect(await q.has(".feed[data-fcf-gone]")).toBe(false);
   await q.done();
 });
@@ -102,6 +103,11 @@ test("mobile feed: a disabled module removes nothing", async () => {
 });
 
 const edge = (category, extra = {}) => ({ category, cursor: "c", node: { __typename: "Story", id: category, ...extra } });
+const RENAMED = {
+  label: "CometNewsFeed_viewerConnection$stream",
+  path: ["viewer", "news_feed", "edges", 7],
+  data: { cursor: "z", node: { __typename: "Story", id: "renamed", th_dat_spo: { __typename: "SponsoredData", ad_id: "3" } } },
+};
 const FEED = {
   data: {
     viewer: {
@@ -114,16 +120,16 @@ const FEED = {
   },
 };
 const DEFERRED = { label: "x$defer$y", path: ["viewer", "news_feed", "edges", 5, "node"], data: { category: "SPONSORED", node: { id: "deferred" } } };
-const GRAPHQL = JSON.stringify(FEED) + "\n" + JSON.stringify(DEFERRED) + "\n" + JSON.stringify({ label: "z", data: { category: "ORGANIC", node: { id: "ok" } } });
+const GRAPHQL = [FEED, DEFERRED, { label: "z", data: { category: "ORGANIC", node: { id: "ok" } } }, RENAMED].map((o) => JSON.stringify(o)).join("\n");
 const shape = (lines) =>
   lines.map((o) =>
     o.data?.viewer
       ? { edges: o.data.viewer.news_feed.edges.map((e) => e.category + ":" + (e.node ? e.node.id : "-")), side: o.data.viewer.sideFeedUnit.nodes.map((n) => n.id) }
       : o.data.category + ":" + (o.data.node ? o.data.node.id : "-"),
   );
-const EXPECT = [{ edges: ["ORGANIC:ORGANIC", "SPONSORED:-", "ORGANIC:-", "ENGAGEMENT:ENGAGEMENT"], side: ["a"] }, "SPONSORED:-", "ORGANIC:ok"];
+const EXPECT = [{ edges: ["ORGANIC:ORGANIC", "SPONSORED:-", "ORGANIC:-", "ENGAGEMENT:ENGAGEMENT"], side: ["a"] }, "SPONSORED:-", "ORGANIC:ok", "undefined:-"];
 
-test("GraphQL feed responses lose sponsored units on fetch, XHR, JSON.parse and through a fresh frame's natives", async () => {
+test("GraphQL feed responses lose sponsored units on fetch, XHR and through a fresh frame's natives; JSON.parse is untouched", async () => {
   const p = await open({ url: FEED_URL, html: fixture("fb-desktop.html"), ...TALL, raw: { "/api/graphql/": GRAPHQL } });
   const r = await p.evaluate(async (src) => {
     const parse = (t) => t.split("\n").map((l) => JSON.parse(l));
@@ -136,22 +142,22 @@ test("GraphQL feed responses lose sponsored units on fetch, XHR, JSON.parse and 
         x.send("q");
       }),
     );
-    const viaParse = src.split("\n").map((l) => JSON.parse(l));
-    const fr = document.body.appendChild(document.createElement("iframe"));
-    const cw = fr.contentWindow;
+    document.body.insertAdjacentHTML("beforeend", '<iframe id="clean" src="about:blank#g"></iframe>');
+    const cw = document.getElementById("clean").contentDocument.defaultView;
     const viaFrameFetch = parse(await (await cw.fetch("/api/graphql/", { method: "POST", body: "q" })).text());
-    const viaFrameParse = src.split("\n").map((l) => cw.JSON.parse(l));
     const str = cw.Function.prototype.toString;
+    const parsed = JSON.parse(src.split("\n")[0]);
+    const feedEdges = parsed.data.viewer.news_feed.edges;
     return {
       viaFetch,
       viaXhr,
-      viaParse,
       viaFrameFetch,
-      viaFrameParse,
+      untouchedParse: feedEdges.length === 4 && !!feedEdges[1].node,
       masked: [str.call(JSON.parse), str.call(fetch), str.call(cw.XMLHttpRequest.prototype.open), Function.prototype.toString.call(Function.prototype.toString)],
     };
   }, GRAPHQL);
-  for (const k of ["viaFetch", "viaXhr", "viaParse", "viaFrameFetch", "viaFrameParse"]) expect(shape(r[k])).toEqual(EXPECT);
+  for (const k of ["viaFetch", "viaXhr", "viaFrameFetch"]) expect(shape(r[k])).toEqual(EXPECT);
+  expect(r.untouchedParse).toBe(true);
   expect(r.masked).toEqual(["function parse() { [native code] }", "function fetch() { [native code] }", "function open() { [native code] }", "function toString() { [native code] }"]);
   await p.done();
 });

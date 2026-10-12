@@ -78,8 +78,11 @@ test("fetch: player, streamed get_watch (array) and Shorts sequence bodies are s
 test("a fresh frame's fetch is the guarded one", async () => {
   const p = await yt();
   const r = await p.evaluate(async () => {
-    const fr = document.body.appendChild(document.createElement("iframe"));
-    return fr.contentWindow.fetch("/youtubei/v1/player?prettyPrint=false", { method: "POST", body: "{}" }).then((r) => r.json());
+    document.body.innerHTML += '<iframe id="clean"></iframe>';
+    return document
+      .getElementById("clean")
+      .contentWindow.fetch("/youtubei/v1/player?prettyPrint=false", { method: "POST", body: "{}" })
+      .then((r) => r.json());
   });
   expect(clean(r)).toEqual({ slots: undefined, ads: undefined, placements: ["clientForecastingAdRenderer"], bka: undefined });
   await p.done();

@@ -436,80 +436,77 @@
         }),
       );
     } catch (_) {}
+    // XHR bodies are edited on every read, not once at the end: Facebook consumes its JSON-lines stream from
+    // readyState 3. The getters live on a subclass, because Facebook restores the base prototype's native
+    // accessors from a clean frame after the page loads; the subclass is registered as the native for toString.
     try {
-      const XP = win.XMLHttpRequest.prototype,
+      const Native = win.XMLHttpRequest,
         seen = new WeakMap();
-      XP.open = asNative(XP.open, (t, self, args) => {
+      const edited = (self, v) => {
+        const st = seen.get(self);
+        if (!st || typeof v !== "string") return v;
+        let real = "";
         try {
-          seen.set(self, String(args[1]));
+          real = self.responseURL;
         } catch (_) {}
-        return Reflect.apply(t, self, args);
-      });
-      XP.send = asNative(XP.send, (t, self, args) => {
-        try {
-          if (hit(seen.get(self)))
-            self.addEventListener("readystatechange", function () {
-              if (this.readyState !== 4) return;
-              let real = "";
-              try {
-                real = this.responseURL;
-              } catch (_) {}
-              if (real && !hit(real)) return;
-              let txt = "";
-              try {
-                txt = this.responseText;
-              } catch (_) {
-                return;
-              }
-              const out = rewrite(txt);
-              if (out === txt) return;
-              try {
-                Object.defineProperty(this, "responseText", { configurable: true, get: () => out });
-                Object.defineProperty(this, "response", { configurable: true, get: () => out });
-              } catch (_) {}
-            });
-        } catch (_) {}
-        return Reflect.apply(t, self, args);
-      });
+        if (real && !hit(real)) return v;
+        if (st.len !== v.length) {
+          st.len = v.length;
+          st.out = rewrite(v);
+        }
+        return st.out;
+      };
+      const XMLHttpRequest = class extends Native {
+        open(...args) {
+          if (hit(args[1])) seen.set(this, { len: -1, out: "" });
+          else seen.delete(this);
+          return super.open(...args);
+        }
+        get response() {
+          return edited(this, super.response);
+        }
+        get responseText() {
+          return edited(this, super.responseText);
+        }
+      };
+      NATIVE.set(XMLHttpRequest, Native);
+      for (const m of ["open", "response", "responseText"])
+        NATIVE.set(Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, m).get || XMLHttpRequest.prototype[m], Object.getOwnPropertyDescriptor(Native.prototype, m).get || Native.prototype[m]);
+      win.XMLHttpRequest = XMLHttpRequest;
     } catch (_) {}
   }
-  const hookParse = (win, pre, edit) => {
-    try {
-      win.JSON.parse = asNative(win.JSON.parse, (t, self, args) => {
-        const o = Reflect.apply(t, self, args);
-        if (typeof args[0] === "string" && pre.test(args[0]))
-          try {
-            edit(o);
-          } catch (_) {}
-        return o;
-      });
-    } catch (_) {}
-  };
   const maskNatives = (win) => {
     try {
       const FP = win.Function.prototype;
       FP.toString = asNative(FP.toString, (t, self, args) => Reflect.apply(t, NATIVE.get(self) || self, args));
     } catch (_) {}
   };
-  // Pages fetch untouched natives from a freshly inserted same-origin frame; the parent's are copied in.
+  // Pages fetch untouched natives from a same-origin frame (Facebook inserts an about:blank#g frame through a
+  // randomly chosen DOM method). Every path to that frame's globals goes through the contentWindow or
+  // contentDocument getter, so the parent's patched natives are copied into any accessible frame on access.
   function guardFrames(win, copyInto) {
-    const fix = (el) => {
+    const fix = (cw) => {
       try {
-        const cw = el.contentWindow;
-        if (cw && (cw.location.href === "about:blank" || cw.location.href === location.href)) copyInto(cw);
+        if (cw && typeof cw.location.href === "string") copyInto(cw);
       } catch (_) {}
     };
-    const wrap = (proto, name) => {
+    for (const [proto, prop, toWin] of [
+      [win.HTMLIFrameElement.prototype, "contentWindow", (v) => v],
+      [win.HTMLIFrameElement.prototype, "contentDocument", (v) => v?.defaultView],
+      [win.HTMLObjectElement.prototype, "contentWindow", (v) => v],
+    ])
       try {
-        proto[name] = asNative(proto[name], (t, self, args) => {
-          const r = Reflect.apply(t, self, args);
-          for (const a of args) if (a instanceof win.HTMLElement) fix(a);
-          return r;
+        const d = Object.getOwnPropertyDescriptor(proto, prop);
+        Object.defineProperty(proto, prop, {
+          configurable: true,
+          enumerable: d.enumerable,
+          get: asNative(d.get, (t, self) => {
+            const v = Reflect.apply(t, self, []);
+            fix(toWin(v));
+            return v;
+          }),
         });
       } catch (_) {}
-    };
-    for (const n of ["appendChild", "insertBefore"]) wrap(win.Node.prototype, n);
-    for (const n of ["append", "prepend", "before", "after", "insertAdjacentElement"]) wrap(win.Element.prototype, n);
   }
 
   const SPON =
@@ -1675,8 +1672,11 @@
 
     if (f.blockAdData) {
       // Translated from uBlock Origin's maintained Facebook filters: drop `node` from feed edges whose category is
-      // SPONSORED, drop any `node` carrying a SponsoredData child, and drop `nodes[]` entries with sponsored_data.
-      const sponsoredNode = (n) => Object.values(n).some((v) => v && typeof v === "object" && v.__typename === "SponsoredData");
+      // SPONSORED, and drop any `node` or `nodes[]` entry carrying a SponsoredData child. The child's key is not
+      // relied on: measured live, the story node carries it as `th_dat_spo`, not `sponsored_data`. JSON.parse is
+      // left alone: Facebook parses a canary of this exact shape through it, and falls back to its own JSON5
+      // parser when the canary comes back edited, so a parse hook is both reported and bypassed.
+      const sponsoredNode = (n) => !!n && typeof n === "object" && Object.values(n).some((v) => v && typeof v === "object" && v.__typename === "SponsoredData");
       const edit = (root) => {
         let changed = false;
         const walk = (o, key, owner, d) => {
@@ -1684,7 +1684,7 @@
           if (Array.isArray(o)) {
             if (key === "nodes")
               for (let i = o.length - 1; i >= 0; i--)
-                if (o[i]?.sponsored_data) {
+                if (sponsoredNode(o[i]) || o[i]?.sponsored_data) {
                   o.splice(i, 1);
                   changed = true;
                 }
@@ -1707,12 +1707,10 @@
       };
       const pre = /"(SPONSORED|SponsoredData|sponsored_data)"/;
       hookResponses(PW, /^https?:\/\/[^/]+\/api\/graphql\b/, textEditor(pre, edit, true));
-      hookParse(PW, pre, edit);
       maskNatives(PW);
       guardFrames(PW, (cw) => {
         cw.fetch = PW.fetch;
         cw.XMLHttpRequest = PW.XMLHttpRequest;
-        cw.JSON = PW.JSON;
         cw.Function.prototype.toString = PW.Function.prototype.toString;
       });
     }
@@ -1882,6 +1880,12 @@
       Object.assign(st, { v: "junk", hidden: true });
     };
 
+    // The desktop label is drawn as an SVG with no text; its ad-info link is the one query-only href carrying
+    // __cft__ without __tn__ (measured live, 48×16, empty text). Organic timestamp links carry __tn__.
+    const adInfoLink = (a) => {
+      const hr = a.getAttribute("href") || "";
+      return hr.startsWith("?") && hr.includes("__cft__") && !hr.includes("__tn__");
+    };
     function processDesktop() {
       const main = q('[role="main"]');
       if (!main) return;
@@ -1893,7 +1897,7 @@
         if (e.closest('[role="complementary"]')) continue;
         const er = e.getBoundingClientRect();
         if (!er.height || er.bottom < -400 || er.top > vh + 400) continue;
-        if (!labelHit(e)) continue;
+        if (!(f.hideSponsored && e.tagName === "A" && adInfoLink(e)) && !labelHit(e)) continue;
         const story = storyOf(e, main);
         if (!story) continue;
         const st = fresh(story, "data-fcf");
