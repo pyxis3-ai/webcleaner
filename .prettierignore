@@ -1,4 +1,4 @@
 node_modules
-dist
-*.min.*
+test/fixtures
 *.json
+bun.lock

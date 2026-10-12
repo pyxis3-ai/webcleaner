@@ -2,11 +2,13 @@
   "name": "webcleaner",
   "private": true,
   "scripts": {
+    "test": "bun test",
     "format": "prettier --write .",
     "lint": "prettier --check .",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
+    "playwright-core": "1.63.0",
     "prettier": "3.9.6"
   }
 }

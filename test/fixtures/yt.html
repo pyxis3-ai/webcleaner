@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>YouTube</title>
+<style>body{margin:0;font:14px sans-serif}ytd-app,ytd-rich-item-renderer,ytd-ad-slot-renderer,ytd-video-renderer,ytd-banner-promo-renderer,tp-yt-paper-dialog,ytd-enforcement-message-view-model{display:block}.card{width:300px;height:80px;border:1px solid #ccc;margin:6px}</style>
+<script>var ytInitialPlayerResponse = {playabilityStatus:{status:"OK",errorScreen:{enforcementMessageViewModel:{}}},adPlacements:[{adPlacementRenderer:{config:{adPlacementConfig:{kind:"AD_PLACEMENT_KIND_START"}},renderer:{instreamVideoAdRenderer:{}}}},{adPlacementRenderer:{config:{adPlacementConfig:{kind:"AD_PLACEMENT_KIND_MIDROLL"}},renderer:{}}}],adSlots:[{}],playerAds:[{}],auxiliaryUi:{messageRenderers:{bkaEnforcementMessageViewModel:{}}},streamingData:{}};
+var ytInitialData = {contents:{},adSlots:[{}]};</script>
+</head><body>
+<ytd-app>
+ <div id="masthead-ad" class="card">masthead</div>
+ <div id="player-ads" class="card">player ads</div>
+ <ytd-banner-promo-renderer class="card">banner</ytd-banner-promo-renderer>
+ <ytd-rich-item-renderer id="feedad" class="card"><ytd-ad-slot-renderer>ad</ytd-ad-slot-renderer></ytd-rich-item-renderer>
+ <ytd-rich-item-renderer id="feedok" class="card"><ytd-video-renderer>video</ytd-video-renderer></ytd-rich-item-renderer>
+ <ytd-rich-item-renderer id="rot" class="card"><div style="width:280px;height:76px"><div><span>Sponsored</span></div><div>Rotated markup ad</div></div></ytd-rich-item-renderer>
+ <tp-yt-paper-dialog id="dlg"><ytd-enforcement-message-view-model id="enf">Ad blockers violate YouTube's Terms of Service</ytd-enforcement-message-view-model></tp-yt-paper-dialog>
+ <tp-yt-iron-overlay-backdrop id="bd"></tp-yt-iron-overlay-backdrop>
+ <video id="v"></video>
+</ytd-app>
+<div id="player-ads" class="bait">bait</div>
+<div id="primary"><div class="ytd-two-column-browse-results-renderer style-scope"><div id="masthead-ad"><div class="ytd-ad-slot-renderer" id="bait-inner">x</div></div></div></div>
+</body></html>
